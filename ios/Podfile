@@ -1,0 +1,217 @@
+# source 'https://github.com/CocoaPods/Specs.git'
+
+# platform :ios, '13.0'
+# ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+# project 'Runner', {
+#   'Debug' => :debug,
+#   'Profile' => :release,
+#   'Release' => :release,
+# }
+
+# $FirebaseSDKVersion = '10.3.0'
+
+# def strip_unsupported_g_flags_globally!(settings)
+#   return if settings.nil?
+#   settings.keys.each do |k|
+#     v = settings[k]
+#     next if v.nil?
+#     if v.is_a?(Array)
+#       settings[k] = v.reject { |f| f.to_s.match?(/\A\-G(\z|\S+)/) }
+#     elsif v.is_a?(String)
+#       tokens = v.split(/\s+/)
+#       tokens.reject! { |f| f.to_s.match?(/\A\-G(\z|\S+)/) }
+#       settings[k] = tokens.join(' ')
+#     end
+#   end
+# end
+
+# def flutter_root
+#   generated = File.expand_path(File.join('..','Flutter','Generated.xcconfig'), __FILE__)
+#   raise "#{generated} must exist. Run flutter pub get first." unless File.exist?(generated)
+#   File.foreach(generated) { |line| return $1.strip if line =~ /FLUTTER_ROOT\=(.*)/ }
+#   raise "FLUTTER_ROOT not found in #{generated}. Delete it and run flutter pub get."
+# end
+
+# require File.expand_path(File.join('packages','flutter_tools','bin','podhelper'), flutter_root)
+# flutter_ios_podfile_setup
+
+# target 'Runner' do
+#   use_frameworks! linkage: :static
+#   # use_modular_headers!
+
+#   pod 'FirebaseFirestore', $FirebaseSDKVersion
+#   pod 'FirebaseAuth',      $FirebaseSDKVersion
+#   pod 'FirebaseMessaging', $FirebaseSDKVersion
+#   pod 'FirebaseStorage',   $FirebaseSDKVersion
+#   pod 'FirebaseCore',      $FirebaseSDKVersion
+
+#   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+#   target 'RunnerTests' do
+#     inherit! :search_paths
+#   end
+# end
+
+# post_install do |installer|
+#   def force_swift_5_9!(config)
+#     # Force Swift 5.9 language mode (avoids Swift 6 existential changes)
+#     config.build_settings['SWIFT_VERSION'] = '5.9'
+#     # Keep concurrency checks relaxed
+#     config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
+#   end
+
+#   installer.pods_project.targets.each do |t|
+#     flutter_additional_ios_build_settings(t)
+
+#     t.build_configurations.each do |cfg|
+#       force_swift_5_9!(cfg)
+#       strip_unsupported_g_flags_globally!(cfg.build_settings)
+
+#       if cfg.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] == 'YES'
+#         cfg.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+#       end
+#       cfg.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+
+#       if cfg.base_configuration_reference && File.exist?(cfg.base_configuration_reference.real_path)
+#         pth = cfg.base_configuration_reference.real_path
+#         xc  = File.read(pth)
+#         xc  = xc.gsub(/GCC_WARN_INHIBIT_ALL_WARNINGS\s*=\s*YES/, 'GCC_WARN_INHIBIT_ALL_WARNINGS = NO')
+#         File.write(pth, xc)
+#       end
+
+#       if cfg.build_settings['INFOPLIST_FILE']&.end_with?('.xcconfig')
+#         cfg.build_settings['INFOPLIST_FILE'] = 'Runner/Info.plist'
+#       end
+#     end
+#   end
+
+#   # Apply to Runner project too
+#   installer.aggregate_targets.each do |agg|
+#     agg.user_project.native_targets.each do |t|
+#       t.build_configurations.each do |cfg|
+#         cfg.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+#         cfg.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+#         force_swift_5_9!(cfg)
+#         strip_unsupported_g_flags_globally!(cfg.build_settings)
+#       end
+#     end
+#     agg.user_project.save
+#   end
+# end
+
+# source 'https://github.com/CocoaPods/Specs.git'
+
+# platform :ios, '13.0'
+# ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+# project 'Runner', { 'Debug' => :debug, 'Profile' => :release, 'Release' => :release }
+
+# def flutter_root
+#   g = File.expand_path(File.join('..','Flutter','Generated.xcconfig'), __FILE__)
+#   raise "#{g} must exist. Run flutter pub get first." unless File.exist?(g)
+#   File.foreach(g) { |line| return $1.strip if line =~ /FLUTTER_ROOT\=(.*)/ }
+#   raise "FLUTTER_ROOT not found in #{g}. Delete it and run flutter pub get."
+# end
+
+# require File.expand_path(File.join('packages','flutter_tools','bin','podhelper'), flutter_root)
+# flutter_ios_podfile_setup
+
+# target 'Runner' do
+#   use_frameworks! linkage: :static
+
+#   # ⬇️ Do NOT declare any Firebase pods here.
+#   # FlutterFire plugins (firebase_core, firebase_auth, etc.) will add the correct pods/versions.
+
+#   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+#   target 'RunnerTests' do
+#     inherit! :search_paths
+#   end
+# end
+
+# post_install do |installer|
+#   installer.pods_project.targets.each do |target|
+#     flutter_additional_ios_build_settings(target)
+#     if target.name == 'BoringSSL-GRPC'
+#       target.source_build_phase.files.each do |file|
+#         if file.settings && file.settings['COMPILER_FLAGS']
+#           flags = file.settings['COMPILER_FLAGS'].split
+#           flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
+#           file.settings['COMPILER_FLAGS'] = flags.join(' ')
+#         end
+#       end
+#     end
+#   end
+# end
+
+source 'https://github.com/CocoaPods/Specs.git'
+
+platform :ios, '13.0'
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', { 'Debug' => :debug, 'Profile' => :release, 'Release' => :release }
+
+def flutter_root
+  g = File.expand_path(File.join('..','Flutter','Generated.xcconfig'), __FILE__)
+  raise "#{g} must exist. Run flutter pub get first." unless File.exist?(g)
+  File.foreach(g) { |line| return $1.strip if line =~ /FLUTTER_ROOT\=(.*)/ }
+  raise "FLUTTER_ROOT not found in #{g}. Delete it and run flutter pub get."
+end
+
+require File.expand_path(File.join('packages','flutter_tools','bin','podhelper'), flutter_root)
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks! linkage: :static
+
+  # Do NOT pin Firebase here. Let FlutterFire choose compatible versions.
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  # helpers
+  def strip_g_tokens!(bs)
+    return if bs.nil?
+    bs.keys.each do |k|
+      v = bs[k]
+      next if v.nil?
+      if v.is_a?(Array)
+        v.reject! { |t| t.to_s =~ /\A\-G(\z|\S+)/ }
+      elsif v.is_a?(String)
+        bs[k] = v.gsub(/(^|\s)-G\S*/, ' ')
+      end
+    end
+  end
+
+  def force_cxx17!(cfg)
+    bs = cfg.build_settings
+    # Force modern C/C++ standards for gRPC / Abseil
+    bs['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
+    bs['CLANG_CXX_LIBRARY'] = 'libc++'
+    bs['GCC_C_LANGUAGE_STANDARD'] = 'gnu11'
+    # Normalize iOS target
+    bs['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+    # Remove any stray -G* flags that previously caused failures
+    strip_g_tokens!(bs)
+  end
+
+  # 1) Pods project
+  installer.pods_project.targets.each do |t|
+    flutter_additional_ios_build_settings(t)
+    t.build_configurations.each { |cfg| force_cxx17!(cfg) }
+  end
+
+  # 2) Runner project
+  installer.aggregate_targets.each do |agg|
+    proj = agg.user_project
+    proj.native_targets.each do |t|
+      t.build_configurations.each { |cfg| force_cxx17!(cfg) }
+    end
+    proj.save
+  end
+end

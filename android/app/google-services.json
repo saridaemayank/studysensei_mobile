@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "525397408168",
+    "project_id": "study-sensei-53462",
+    "storage_bucket": "study-sensei-53462.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:525397408168:android:1d31f10b6372525a06059d",
+        "android_client_info": {
+          "package_name": "com.mayank.study_sensei"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1cSrwslN64h79mOeTff--JXEzb-gDdMk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
