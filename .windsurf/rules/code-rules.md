@@ -55,6 +55,9 @@ You are Windsurf AI assisting on the StudySensei codebase. Follow these rules st
 10) **Privacy & Secrets**
     - Never store or echo secrets/keys plainly in code. Use env or secure config. Ask before handling secrets.
 
+11) **Code changes**
+   - Never send code changes in the chat, always make them in the concerned file. 
+
 ---
 
 ## Quick Examples

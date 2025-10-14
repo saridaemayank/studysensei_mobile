@@ -28,9 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-      ),
+      appBar: AppBar(automaticallyImplyLeading: false),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -120,11 +118,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8.0),
 
                 // Remember Me & Forgot Password
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    // Remember Me
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Checkbox(
                           value: _rememberMe,
@@ -142,19 +143,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ?.copyWith(fontWeight: FontWeight.w500),
                         ),
                       ],
-                    ),
-                    // Forgot Password
-                    TextButton(
-                      onPressed: () {
-                        // TODO: Implement forgot password
-                      },
-                      child: Text(
-                        'Forgot Password?',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).primaryColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -182,11 +170,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24.0),
 
                 // Sign Up Link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
                   children: [
                     Text(
-                      "Don't have an account? ",
+                      "Don't have an account?",
                       style: Theme.of(
                         context,
                       ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
@@ -215,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -223,17 +213,17 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       // Get the UserProvider instance
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
+
       // Sign in using UserProvider
       await userProvider.signInWithEmailAndPassword(
         _emailController.text.trim(),
         _passwordController.text,
       );
-      
+
       // No need to navigate here - the auth state listener in UserProvider will handle it
     } on FirebaseAuthException catch (e) {
-      String message = 'An error occurred. Please try again.';
-      
+      String message = '$e';
+
       if (e.code == 'user-not-found' || e.code == 'wrong-password') {
         message = 'Invalid email or password.';
       } else if (e.code == 'too-many-requests') {
@@ -241,11 +231,11 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (e.code == 'user-disabled') {
         message = 'This account has been disabled.';
       }
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (e) {
       if (mounted) {

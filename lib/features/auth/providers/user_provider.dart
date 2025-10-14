@@ -8,7 +8,7 @@ class UserProvider with ChangeNotifier {
   UserPreferences? _userPreferences;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // Getters
   User? get user => _user;
   bool get isAuthenticated => _user != null;
@@ -33,13 +33,16 @@ class UserProvider with ChangeNotifier {
     try {
       // First try to get from users collection
       final userDoc = await _firestore.collection('users').doc(userId).get();
-      
+
       if (userDoc.exists) {
         debugPrint('Firestore User Data: ${userDoc.data()}');
         _userPreferences = UserPreferences.fromMap(userDoc.data()!, userId);
       } else {
         // Fallback to userPreferences collection for backward compatibility
-        final prefsDoc = await _firestore.collection('userPreferences').doc(userId).get();
+        final prefsDoc = await _firestore
+            .collection('userPreferences')
+            .doc(userId)
+            .get();
         if (prefsDoc.exists) {
           debugPrint('Firestore Preferences Data: ${prefsDoc.data()}');
           _userPreferences = UserPreferences.fromMap(prefsDoc.data()!, userId);
@@ -62,13 +65,13 @@ class UserProvider with ChangeNotifier {
       // Clear local state first
       _user = null;
       _userPreferences = null;
-      
+
       // Clear any pending operations
       await Future.wait([
         // Add any other cleanup operations here
         Future.delayed(Duration.zero),
       ]);
-      
+
       notifyListeners();
     } catch (e) {
       debugPrint('Error during signOut cleanup: $e');
@@ -86,6 +89,7 @@ class UserProvider with ChangeNotifier {
     List<String>? subjects,
     String? preferredTheme,
     bool? notificationsEnabled,
+    String? photoUrl,
   }) async {
     if (_userPreferences == null) return;
 
@@ -98,6 +102,7 @@ class UserProvider with ChangeNotifier {
       subjects: subjects,
       preferredTheme: preferredTheme,
       notificationsEnabled: notificationsEnabled,
+      photoUrl: photoUrl,
     );
 
     await _savePreferences();
@@ -107,7 +112,7 @@ class UserProvider with ChangeNotifier {
   // Save preferences to Firestore
   Future<void> _savePreferences() async {
     if (_userPreferences == null || _user == null) return;
-    
+
     try {
       await _firestore
           .collection('userPreferences')

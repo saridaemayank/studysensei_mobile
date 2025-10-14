@@ -15,6 +15,9 @@ class TtsService {
   String? _currentLanguage;
   String? _currentVoice;
   String? _currentContent;
+  int _currentProgress = 0;
+  int _progressBaseOffset = 0;
+  bool _suppressCompletionUpdates = false;
 
   // Getters
   bool get isPlaying => stateNotifier.value == TtsState.playing;
@@ -44,12 +47,25 @@ class TtsService {
       });
 
       _flutterTts.setCompletionHandler(() {
+        if (_suppressCompletionUpdates) return;
+
         stateNotifier.value = TtsState.stopped;
+        _currentProgress = _currentContent?.length ?? 0;
+        _progressBaseOffset = 0;
       });
 
       _flutterTts.setErrorHandler((msg) {
         stateNotifier.value = TtsState.error;
         _lastError = _parseError(msg);
+      });
+
+      _flutterTts.setProgressHandler((
+        String text,
+        int start,
+        int end,
+        String word,
+      ) {
+        _currentProgress = _progressBaseOffset + end;
       });
 
       return true;
@@ -130,6 +146,9 @@ class TtsService {
     if (text.isEmpty) return false;
 
     try {
+      _currentContent = text;
+      _currentProgress = 0;
+      _progressBaseOffset = 0;
       final result = await _flutterTts.speak(text);
       if (result == 1) {
         stateNotifier.value = TtsState.playing;
@@ -143,6 +162,22 @@ class TtsService {
     }
   }
 
+  // Update the cached content without triggering playback
+  void updateContent(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      _currentContent = null;
+      _currentProgress = 0;
+      _progressBaseOffset = 0;
+    } else {
+      if (_currentContent != trimmed) {
+        _currentContent = trimmed;
+        _currentProgress = 0;
+        _progressBaseOffset = 0;
+      }
+    }
+  }
+
   // Stop TTS and clean up
   Future<void> stop() async {
     try {
@@ -151,6 +186,8 @@ class TtsService {
         stateNotifier.value = TtsState.stopped;
       }
       _currentContent = null;
+      _currentProgress = 0;
+      _progressBaseOffset = 0;
     } catch (e) {
       stateNotifier.value = TtsState.error;
       _lastError = TtsError.unknown;
@@ -165,7 +202,14 @@ class TtsService {
         stateNotifier.value = TtsState.paused;
         return true;
       }
-      return false;
+      _suppressCompletionUpdates = true;
+      try {
+        await _flutterTts.stop();
+      } finally {
+        _suppressCompletionUpdates = false;
+      }
+      stateNotifier.value = TtsState.paused;
+      return true;
     } catch (e) {
       stateNotifier.value = TtsState.error;
       _lastError = TtsError.unknown;
@@ -175,15 +219,25 @@ class TtsService {
 
   // Resume speaking from where it was paused
   Future<bool> resume() async {
+    if (_currentContent == null) return false;
+
     try {
-      if (_currentContent != null) {
-        // On some platforms, we need to stop and restart to resume
+      if (_currentProgress >= _currentContent!.length) {
+        return false;
+      }
+
+      _suppressCompletionUpdates = true;
+      try {
         await _flutterTts.stop();
-        final result = await _flutterTts.speak(_currentContent!);
-        if (result == 1) {
-          stateNotifier.value = TtsState.playing;
-          return true;
-        }
+      } finally {
+        _suppressCompletionUpdates = false;
+      }
+      _progressBaseOffset = _currentProgress;
+      final remaining = _currentContent!.substring(_currentProgress);
+      final result = await _flutterTts.speak(remaining);
+      if (result == 1) {
+        stateNotifier.value = TtsState.playing;
+        return true;
       }
       return false;
     } catch (e) {
@@ -230,6 +284,7 @@ class TtsService {
     _flutterTts.setStartHandler(() {});
     _flutterTts.setCompletionHandler(() {});
     _flutterTts.setErrorHandler((_) {});
+    _flutterTts.setProgressHandler((_, __, ___, ____) {});
     await _flutterTts.stop();
     stateNotifier.dispose();
   }

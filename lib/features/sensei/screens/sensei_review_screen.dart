@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -11,7 +9,6 @@ import '../services/backend_service.dart';
 import '../models/sensei_session.dart';
 import '../widgets/language_voice_picker.dart';
 import 'sensei_generate_screen.dart';
-import '../services/tts_service.dart';
 
 class SenseiReviewScreen extends StatefulWidget {
   final String subject;
@@ -43,9 +40,6 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
   String _selectedVoice = 'Default Voice';
   bool _isGenerating = false;
   double _generationProgress = 0.0;
-  bool _isPlayingTts = false;
-
-  late final TtsService _ttsService = TtsService()..init();
 
   @override
   Widget build(BuildContext context) {
@@ -72,34 +66,11 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          _isGenerating
-              ? _buildGeneratingView(theme)
-              : _buildReviewView(theme, colorScheme),
-
-          // TTS Button - Fixed at bottom right
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: FloatingActionButton(
-              heroTag: 'tts_button',
-              onPressed: _toggleTts,
-              backgroundColor: colorScheme.primary,
-              child: Icon(
-                _isPlayingTts ? Icons.volume_off : Icons.volume_up,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
+      body: _isGenerating
+          ? _buildGeneratingView(theme)
+          : _buildReviewView(theme, colorScheme),
     );
   }
-
-  // Video player controller
-  VideoPlayerController? _videoPlayerController;
-  ChewieController? _chewieController;
 
   // Helper method to safely get progress value for LinearProgressIndicator
   double _getSafeProgressValue(double progress) {
@@ -118,8 +89,6 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
   @override
   void initState() {
     super.initState();
-    // Start video initialization in the background
-    _initializeVideoPlayer();
     _loadDetectedObjects();
   }
 
@@ -140,113 +109,6 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
       }
     } catch (e) {
       debugPrint('Error loading detected objects: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    _disposeVideoControllers();
-    _ttsService.dispose();
-    super.dispose();
-  }
-
-  Future<void> _disposeVideoControllers() async {
-    try {
-      if (_chewieController != null) {
-        _chewieController!.dispose();
-        _chewieController = null;
-      }
-      if (_videoPlayerController != null) {
-        await _videoPlayerController!.dispose();
-        _videoPlayerController = null;
-      }
-    } catch (e) {
-      debugPrint('Error disposing video controllers: $e');
-    }
-  }
-
-  Future<void> _initializeVideoPlayer() async {
-    try {
-      final videoUrl = widget.videoUrl ?? widget.session?.videoUrl;
-      if (videoUrl == null || videoUrl.isEmpty) {
-        debugPrint('ℹ️ No video URL provided for preview');
-        return;
-      }
-
-      debugPrint('🔄 Initializing video player with URL: $videoUrl');
-
-      // Dispose of existing controllers if any
-      await _disposeVideoControllers();
-
-      try {
-        // Initialize video controller with basic configuration
-        _videoPlayerController = VideoPlayerController.network(
-          videoUrl,
-          videoPlayerOptions: VideoPlayerOptions(
-            mixWithOthers: true,
-            allowBackgroundPlayback: false,
-          ),
-        );
-
-        // Set volume and initialize with timeout
-        await _videoPlayerController!.setVolume(1.0);
-
-        await _videoPlayerController!.initialize().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('⚠️ Video initialization timed out');
-            return _videoPlayerController!;
-          },
-        );
-
-        if (_videoPlayerController!.value.isInitialized) {
-          debugPrint('✅ Video player initialized successfully');
-          if (mounted) {
-            setState(() {});
-          }
-        }
-      } catch (e) {
-        debugPrint('⚠️ Video initialization failed: $e');
-        // Don't show error to user, video is optional
-      }
-    } catch (e) {
-      debugPrint('❌ Error in _initializeVideoPlayer: $e');
-    }
-  }
-
-  Future<void> _toggleTts() async {
-    try {
-      if (_isPlayingTts) {
-        await _ttsService.stop();
-        if (mounted) {
-          setState(() => _isPlayingTts = false);
-        }
-      } else {
-        // Get the first available content to speak
-        final textToSpeak =
-            widget.session?.analysis ??
-            widget.session?.summary ??
-            widget.session?.narrationScript ??
-            '';
-
-        if (textToSpeak.isNotEmpty) {
-          await _ttsService.speak(textToSpeak);
-          if (mounted) {
-            setState(() => _isPlayingTts = true);
-          }
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No content available to read')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error toggling TTS: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error playing audio: ${e.toString()}')),
-        );
-      }
     }
   }
 
@@ -494,27 +356,23 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                children: [
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child:
-                        _videoPlayerController != null &&
-                            _videoPlayerController!.value.isInitialized
-                        ? Chewie(controller: _chewieController!)
-                        : Container(
-                            color: Colors.black,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Container(
+                  color: colorScheme.surfaceVariant,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.play_circle_outline,
+                          size: 48,
+                          color: colorScheme.primary,
+                        ),
+                      ],
+                    ),
                   ),
-                  // TTS button removed from here - will be added at the bottom of the screen
-                ],
+                ),
               ),
             ),
           ),
@@ -535,7 +393,6 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
                           color: colorScheme.primary,
                         ),
                       ),
-                      // TTS button removed from here - will be added at the bottom of the screen
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -572,7 +429,6 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
                           color: colorScheme.primary,
                         ),
                       ),
-                      // TTS button removed from here - will be added at the bottom of the screen
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -594,40 +450,41 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
           ],
 
           // Key Concepts section - Only show if we have concepts from the API
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Key Concepts:',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+          if (_detectedObjects.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Key Concepts:',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _detectedObjects
-                      .map(
-                        (concept) => Chip(
-                          label: Text(concept),
-                          backgroundColor: colorScheme.primaryContainer,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _detectedObjects
+                        .map(
+                          (concept) => Chip(
+                            label: Text(concept),
+                            backgroundColor: colorScheme.primaryContainer,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
+                        )
+                        .toList(),
+                  ),
+                ],
+              ),
             ),
-          ),
 
           // Hook section
           if (widget.session?.hook?.isNotEmpty ?? false) ...[
@@ -674,15 +531,19 @@ class _SenseiReviewScreenState extends State<SenseiReviewScreen> {
           // Generate button
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: FilledButton.icon(
-              onPressed: _generateLesson,
-              icon: const Icon(Icons.auto_awesome_rounded),
-              label: const Text('Generate Lesson'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Center(
+              child: FilledButton(
+                onPressed: _generateLesson,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
+                child: const Text('Generate Lesson'),
               ),
             ),
           ),

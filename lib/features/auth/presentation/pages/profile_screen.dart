@@ -47,6 +47,11 @@ class ProfileScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     final userProvider = Provider.of<UserProvider>(context);
     final userData = userProvider.userPreferences;
+    final profilePhotoUrl = (userData?.photoUrl?.isNotEmpty ?? false)
+        ? userData!.photoUrl
+        : (user?.photoURL?.isNotEmpty ?? false)
+            ? user!.photoURL
+            : null;
     
     // Debug print to check user data
     debugPrint('User Data: ${userData?.toMap().toString()}');
@@ -79,16 +84,20 @@ class ProfileScreen extends StatelessWidget {
                 backgroundColor: Theme.of(
                   context,
                 ).primaryColor.withOpacity(0.2),
-                child: Text(
-                  user?.displayName?.isNotEmpty == true
-                      ? user!.displayName![0].toUpperCase()
-                      : '?',
-                  style: TextStyle(
-                    fontSize: 48,
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                backgroundImage:
+                    profilePhotoUrl != null ? NetworkImage(profilePhotoUrl) : null,
+                child: profilePhotoUrl == null
+                    ? Text(
+                        user?.displayName?.isNotEmpty == true
+                            ? user!.displayName![0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          fontSize: 48,
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 20),

@@ -10,9 +10,17 @@ import 'package:study_sensei/features/common/layouts/main_layout.dart';
 import 'package:study_sensei/features/friends/presentation/bloc/friend_bloc.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/group_bloc.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } on FirebaseException catch (e) {
+    if (e.code == 'duplicate-app' || e.code == 'app/duplicate-app') {
+      Firebase.app();
+    } else {
+      rethrow;
+    }
+  }
   runApp(const MyApp());
 }
 

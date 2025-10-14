@@ -11,9 +11,9 @@ abstract class AssignmentEvent extends Equatable {
 
 class UpdateAssignments extends AssignmentEvent {
   final List<GroupAssignment> assignments;
-  
+
   const UpdateAssignments(this.assignments);
-  
+
   @override
   List<Object> get props => [assignments];
 }
@@ -106,13 +106,15 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
       emit(AssignmentLoadSuccess(event.assignments));
     });
     on<CompleteAssignment>(_onCompleteAssignment);
-    
+
     // Log state changes
     stream.listen((state) {
       if (state is AssignmentError) {
         print('AssignmentBloc - State changed to Error: ${state.message}');
       } else if (state is AssignmentLoadSuccess) {
-        print('AssignmentBloc - State changed to LoadSuccess with ${state.assignments.length} assignments');
+        print(
+          'AssignmentBloc - State changed to LoadSuccess with ${state.assignments.length} assignments',
+        );
       } else if (state is AssignmentLoading) {
         print('AssignmentBloc - State changed to Loading');
       }
@@ -132,11 +134,11 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
           .doc(assignment.id);
 
       await docRef.set(assignment.toMap());
-      
+
       // Update local cache
       final assignments = _assignmentsCache[event.groupId] ?? [];
       _assignmentsCache[event.groupId] = [assignment, ...assignments];
-      
+
       emit(AssignmentOperationSuccess());
       emit(AssignmentLoadSuccess(_assignmentsCache[event.groupId]!));
     } catch (e) {
@@ -164,7 +166,7 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
           }
           return a;
         }).toList();
-        
+
         emit(AssignmentLoadSuccess(updatedAssignments));
       }
 
@@ -176,18 +178,23 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
         }
 
         final data = doc.data()!;
-        final userCompletion = Map<String, bool>.from(data['userCompletion'] ?? {});
+        final userCompletion = Map<String, bool>.from(
+          data['userCompletion'] ?? {},
+        );
         userCompletion[event.userId] = event.isCompleted;
-        
-        print('Updating completion for user ${event.userId} to ${event.isCompleted}');
-        
+
+        print(
+          'Updating completion for user ${event.userId} to ${event.isCompleted}',
+        );
+
         // Get the list of all assigned users
         final assignedTo = List<String>.from(data['assignedTo'] ?? []);
-        
+
         // Check if all assigned users have completed the assignment
-        final allCompleted = assignedTo.isNotEmpty && 
+        final allCompleted =
+            assignedTo.isNotEmpty &&
             assignedTo.every((userId) => userCompletion[userId] == true);
-            
+
         // Update the status based on completion
         String newStatus = 'inProgress';
         if (allCompleted) {
@@ -214,7 +221,9 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
     } catch (e) {
       // Revert on error
       if (state is AssignmentLoadSuccess) {
-        emit(AssignmentLoadSuccess((state as AssignmentLoadSuccess).assignments));
+        emit(
+          AssignmentLoadSuccess((state as AssignmentLoadSuccess).assignments),
+        );
       }
       emit(AssignmentError('Failed to update assignment: $e'));
     }
@@ -224,8 +233,10 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
     LoadAssignments event,
     Emitter<AssignmentState> emit,
   ) async {
-    print('AssignmentBloc - Handling LoadAssignments for group ${event.groupId}');
-    
+    print(
+      'AssignmentBloc - Handling LoadAssignments for group ${event.groupId}',
+    );
+
     // Only emit loading state if we don't have cached data
     if (_assignmentsCache[event.groupId] == null) {
       emit(AssignmentLoading());
@@ -234,7 +245,7 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
     try {
       // Cancel any existing subscription
       await _subscription?.cancel();
-      
+
       // Initial load
       final querySnapshot = await _firestore
           .collection('groups')
@@ -249,7 +260,7 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
 
       _assignmentsCache[event.groupId] = assignments;
       emit(AssignmentLoadSuccess(assignments));
-      
+
       // Set up real-time updates
       _subscription = _firestore
           .collection('groups')
@@ -257,29 +268,31 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
           .collection('assignments')
           .orderBy('createdAt', descending: true)
           .snapshots()
-          .listen((snapshot) {
-            if (isClosed) return;
-            
-            try {
-              final updatedAssignments = snapshot.docs
-                  .map((doc) => GroupAssignment.fromMap(doc.id, doc.data()))
-                  .toList();
-                  
-              _assignmentsCache[event.groupId] = updatedAssignments;
-              add(UpdateAssignments(updatedAssignments));
-            } catch (e) {
-              print('AssignmentBloc - Error parsing assignments: $e');
-              if (!isClosed) {
-                emit(AssignmentError('Error updating assignments: $e'));
+          .listen(
+            (snapshot) {
+              if (isClosed) return;
+
+              try {
+                final updatedAssignments = snapshot.docs
+                    .map((doc) => GroupAssignment.fromMap(doc.id, doc.data()))
+                    .toList();
+
+                _assignmentsCache[event.groupId] = updatedAssignments;
+                add(UpdateAssignments(updatedAssignments));
+              } catch (e) {
+                print('AssignmentBloc - Error parsing assignments: $e');
+                if (!isClosed) {
+                  emit(AssignmentError('Error updating assignments: $e'));
+                }
               }
-            }
-          }, onError: (e) {
-            print('AssignmentBloc - Firestore error: $e');
-            if (!isClosed) {
-              emit(AssignmentError('Failed to update assignments: $e'));
-            }
-          });
-      
+            },
+            onError: (e) {
+              print('AssignmentBloc - Firestore error: $e');
+              if (!isClosed) {
+                emit(AssignmentError('Failed to update assignments: $e'));
+              }
+            },
+          );
     } catch (e) {
       print('AssignmentBloc - Error in _onLoadAssignments: $e');
       if (!isClosed) {

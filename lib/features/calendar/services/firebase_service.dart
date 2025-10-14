@@ -26,7 +26,7 @@ class FirebaseService {
   }
 
   // Get user's assignments subcollection
-  static CollectionReference<Map<String, dynamic>> get _assignmentsCollection => 
+  static CollectionReference<Map<String, dynamic>> get _assignmentsCollection =>
       _userDoc.collection('assignments');
 
   // Get all assignments for current user
@@ -40,12 +40,34 @@ class FirebaseService {
     required String subject,
     required DateTime deadline,
   }) async {
-    await _assignmentsCollection.add({
+    final user = currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+
+    final assignmentData = {
       'name': name,
       'subject': subject,
       'deadline': Timestamp.fromDate(deadline),
+      'isCompleted': false,
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    };
+
+    final publicAssignmentData = {
+      ...assignmentData,
+      'userId': user.uid,
+    };
+
+    final batch = _firestore.batch();
+
+    final userAssignmentRef = _assignmentsCollection.doc();
+    final publicAssignmentRef =
+        _firestore.collection('assignments').doc(); // Public collection
+
+    batch.set(userAssignmentRef, assignmentData);
+    batch.set(publicAssignmentRef, publicAssignmentData);
+
+    await batch.commit();
   }
 
   // Delete an assignment for current user
@@ -68,14 +90,17 @@ class FirebaseService {
       'createdAt': FieldValue.serverTimestamp(),
     });
   }
+
   // Get all subjects for current user
   static Stream<List<String>> getUserSubjects() {
     try {
       return _userSubjectsCollection
           .orderBy('name')
           .snapshots()
-          .map((snapshot) => 
-              snapshot.docs.map((doc) => doc['name'] as String).toList());
+          .map(
+            (snapshot) =>
+                snapshot.docs.map((doc) => doc['name'] as String).toList(),
+          );
     } catch (e) {
       return const Stream.empty();
     }
@@ -99,13 +124,13 @@ class FirebaseService {
 
       // Update subjects subcollection
       final batch = _firestore.batch();
-      
+
       // Clear existing subjects
       final existingSubjects = await _userSubjectsCollection.get();
       for (var doc in existingSubjects.docs) {
         batch.delete(doc.reference);
       }
-      
+
       // Add new subjects
       for (var subject in subjects) {
         batch.set(_userSubjectsCollection.doc(), {
@@ -113,7 +138,7 @@ class FirebaseService {
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
-      
+
       await batch.commit();
     } catch (e) {
       print('Error updating user data: $e');
