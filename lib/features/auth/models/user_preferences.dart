@@ -24,6 +24,7 @@ class UserPreferences {
   final List<String>? subjects;
   final String? preferredTheme;
   final bool? notificationsEnabled;
+  final String? photoUrl;
 
   UserPreferences({
     this.userId,
@@ -35,6 +36,7 @@ class UserPreferences {
     this.subjects,
     this.preferredTheme = 'system',
     this.notificationsEnabled = true,
+    this.photoUrl,
   });
 
   // Convert UserPreferences to a Map for Firestore
@@ -50,6 +52,7 @@ class UserPreferences {
       'preferredTheme': preferredTheme,
       'notificationsEnabled': notificationsEnabled,
       'updatedAt': DateTime.now().toIso8601String(),
+      'photoUrl': photoUrl,
     };
   }
 
@@ -66,6 +69,7 @@ class UserPreferences {
     final phone = map['phoneNumber'] ?? map['phone'] ?? '';
     final dateOfBirth = map['dateOfBirth'] ?? map['dob'] ?? map['birthDate'];
     final gender = map['gender'] ?? '';
+    final photoUrl = map['photoUrl'] ?? map['photoURL'] ?? map['avatarUrl'];
 
     return UserPreferences(
       userId: documentId,
@@ -77,6 +81,7 @@ class UserPreferences {
       subjects: List<String>.from(map['subjects'] ?? []),
       preferredTheme: map['preferredTheme']?.toString() ?? 'system',
       notificationsEnabled: map['notificationsEnabled'] ?? true,
+      photoUrl: photoUrl?.toString(),
     );
   }
 
@@ -91,6 +96,7 @@ class UserPreferences {
     List<String>? subjects,
     String? preferredTheme,
     bool? notificationsEnabled,
+    String? photoUrl,
   }) {
     return UserPreferences(
       userId: userId,
@@ -102,6 +108,7 @@ class UserPreferences {
       subjects: subjects ?? this.subjects,
       preferredTheme: preferredTheme ?? this.preferredTheme,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      photoUrl: photoUrl ?? this.photoUrl,
     );
   }
 }

@@ -67,7 +67,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
     if (user == null) return;
 
     final newStatus = !currentStatus;
-    
+
     try {
       // Update the assignment status in Firestore
       await _firestore
@@ -79,7 +79,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
             'isCompleted': newStatus,
             'updatedAt': FieldValue.serverTimestamp(),
           });
-      
+
       // Find and update the corresponding calendar event
       final calendarEvents = await _firestore
           .collection('users')
@@ -87,7 +87,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
           .collection('calendar_events')
           .where('assignmentId', isEqualTo: docId)
           .get();
-      
+
       if (calendarEvents.docs.isNotEmpty) {
         final batch = _firestore.batch();
         for (var doc in calendarEvents.docs) {

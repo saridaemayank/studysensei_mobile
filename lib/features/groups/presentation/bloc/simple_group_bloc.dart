@@ -51,7 +51,7 @@ class GroupFailure extends GroupState {
 
 class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   SimpleGroupBloc() : super(GroupInitial()) {
     on<LoadUserGroups>(_onLoadUserGroups);
     on<CreateGroup>(_onCreateGroup);
@@ -62,8 +62,14 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
     Emitter<GroupState> emit,
   ) async {
     try {
-      emit(GroupLoading(groups: state is GroupLoadSuccess ? (state as GroupLoadSuccess).groups : []));
-      
+      emit(
+        GroupLoading(
+          groups: state is GroupLoadSuccess
+              ? (state as GroupLoadSuccess).groups
+              : [],
+        ),
+      );
+
       // Get groups where user is a member (from the groups collection)
       final groupsQuery = await _firestore
           .collection('groups')
@@ -93,14 +99,17 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
       for (final doc in userGroupsSnapshot.docs) {
         final groupId = doc.data()['groupId'] as String?;
         if (groupId != null && !groupIds.contains(groupId)) {
-          final groupDoc = await _firestore.collection('groups').doc(groupId).get();
+          final groupDoc = await _firestore
+              .collection('groups')
+              .doc(groupId)
+              .get();
           if (groupDoc.exists) {
             groups.add(Group.fromMap(groupId, groupDoc.data()!));
             groupIds.add(groupId);
           }
         }
       }
-      
+
       emit(GroupLoadSuccess(groups: groups));
     } catch (e) {
       print('Error loading groups: $e');
@@ -113,11 +122,19 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
     Emitter<GroupState> emit,
   ) async {
     try {
-      emit(GroupLoading(groups: state is GroupLoadSuccess ? (state as GroupLoadSuccess).groups : []));
-      
+      emit(
+        GroupLoading(
+          groups: state is GroupLoadSuccess
+              ? (state as GroupLoadSuccess).groups
+              : [],
+        ),
+      );
+
       // Add the group to Firestore
-      final groupRef = await _firestore.collection('groups').add(event.group.toMap());
-      
+      final groupRef = await _firestore
+          .collection('groups')
+          .add(event.group.toMap());
+
       // Add group reference to user's groups subcollection
       await _firestore
           .collection('users')
@@ -129,7 +146,7 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
             'joinedAt': FieldValue.serverTimestamp(),
             'isAdmin': true,
           });
-      
+
       // Add group reference to each member's groups subcollection
       for (final memberId in event.group.memberIds) {
         if (memberId != event.group.createdBy) {
@@ -145,10 +162,10 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
               });
         }
       }
-      
+
       // Reload groups
       add(LoadUserGroups(event.group.createdBy));
-      
+
       emit(GroupOperationSuccess(message: 'Group created successfully'));
     } catch (e) {
       emit(GroupFailure(errorMessage: 'Failed to create group: $e'));

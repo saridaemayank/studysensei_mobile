@@ -8,6 +8,7 @@ import 'sensei_generate_screen.dart';
 import '../../auth/providers/user_provider.dart';
 import '../services/sensei_api_service.dart';
 import '../models/sensei_session.dart';
+import '../../calendar/services/firebase_service.dart';
 
 class SenseiLandingScreen extends StatefulWidget {
   const SenseiLandingScreen({super.key});
@@ -17,7 +18,7 @@ class SenseiLandingScreen extends StatefulWidget {
 }
 
 class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
-  final List<String> subjects = [
+  static const List<String> _defaultSubjects = [
     'Physics',
     'Chemistry',
     'Mathematics',
@@ -26,15 +27,18 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
     'Other',
   ];
 
+  List<String> _subjects = _defaultSubjects;
   String selectedSubject = 'Physics';
   final TextEditingController _conceptController = TextEditingController();
   final FocusNode _conceptFocusNode = FocusNode();
   bool _isLoading = false;
   bool _isLoadingSessions = false;
+  bool _isLoadingSubjects = false;
   List<SenseiSession> _sessions = [];
   late SenseiApiService _apiService;
 
   StreamSubscription<List<SenseiSession>>? _sessionsSubscription;
+  StreamSubscription<List<String>>? _subjectsSubscription;
   bool _isInitialized = false;
 
   @override
@@ -45,12 +49,15 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
       if (userProvider.isAuthenticated) {
         _apiService = SenseiApiService(user: userProvider.user);
         _loadSessions();
+        _loadSubjects();
         _isInitialized = true;
       } else {
         // Handle unauthenticated state if needed
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please sign in to view your sessions')),
+            const SnackBar(
+              content: Text('Please sign in to view your sessions'),
+            ),
           );
         }
       }
@@ -60,6 +67,7 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
   @override
   void dispose() {
     _sessionsSubscription?.cancel();
+    _subjectsSubscription?.cancel();
     _conceptController.dispose();
     _conceptFocusNode.dispose();
     super.dispose();
@@ -67,7 +75,7 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
 
   void _loadSessions() {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoadingSessions = true;
     });
@@ -88,10 +96,53 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
             _isLoadingSessions = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to load sessions. Please try again.')),
+            const SnackBar(
+              content: Text('Failed to load sessions. Please try again.'),
+            ),
           );
         }
         debugPrint('Error loading sessions: $e');
+      },
+    );
+  }
+
+  void _loadSubjects() {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingSubjects = true;
+    });
+
+    _subjectsSubscription?.cancel();
+    _subjectsSubscription = FirebaseService.getUserSubjects().listen(
+      (subjects) {
+        if (mounted) {
+          setState(() {
+            _subjects = subjects.isNotEmpty ? subjects : _defaultSubjects;
+            _isLoadingSubjects = false;
+
+            // Update selected subject if current selection is not in the new list
+            if (!_subjects.contains(selectedSubject)) {
+              selectedSubject = _subjects.isNotEmpty
+                  ? _subjects.first
+                  : 'Physics';
+            }
+          });
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() {
+            _subjects = _defaultSubjects;
+            _isLoadingSubjects = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to load subjects. Using default subjects.'),
+            ),
+          );
+        }
+        debugPrint('Error loading subjects: $e');
       },
     );
   }
@@ -165,15 +216,13 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
     final theme = Theme.of(context);
     final userProvider = Provider.of<UserProvider>(context);
     final user = FirebaseAuth.instance.currentUser;
-    
+
     // Redirect to login if not authenticated
     if (!userProvider.isAuthenticated) {
       Future.microtask(() {
         Navigator.of(context).pushReplacementNamed('/login');
       });
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -195,7 +244,10 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () async => _loadSessions(),
+        onRefresh: () async {
+          _loadSessions();
+          _loadSubjects();
+        },
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           physics: const AlwaysScrollableScrollPhysics(),
@@ -227,29 +279,36 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: subjects
-                      .map(
-                        (subject) => Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: SubjectChip(
-                            label: subject,
-                            isSelected: selectedSubject == subject,
-                            onSelected: (isSelected) {
-                              if (isSelected) {
-                                setState(() {
-                                  selectedSubject = subject;
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
+              _isLoadingSubjects
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _subjects
+                            .map(
+                              (subject) => Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: SubjectChip(
+                                  label: subject,
+                                  isSelected: selectedSubject == subject,
+                                  onSelected: (isSelected) {
+                                    if (isSelected) {
+                                      setState(() {
+                                        selectedSubject = subject;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
               const SizedBox(height: 24),
 
               // Concept Input
@@ -292,7 +351,9 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         )
                       : const Text(
                           'Start Learning',
@@ -324,44 +385,46 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
               _isLoadingSessions
                   ? const Center(child: CircularProgressIndicator())
                   : _sessions.isEmpty
-                      ? Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.history_toggle_off_outlined,
-                                size: 48,
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No recent sessions',
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Your learning sessions will appear here',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _sessions.length,
-                          itemBuilder: (context, index) {
-                            final session = _sessions[index];
-                            return _buildSessionCard(session, theme);
-                          },
+                  ? Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceVariant.withOpacity(
+                          0.5,
                         ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.history_toggle_off_outlined,
+                            size: 48,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No recent sessions',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Your learning sessions will appear here',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _sessions.length,
+                      itemBuilder: (context, index) {
+                        final session = _sessions[index];
+                        return _buildSessionCard(session, theme);
+                      },
+                    ),
             ],
           ),
         ),
@@ -373,9 +436,7 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _navigateToReviewScreen(session),
@@ -415,7 +476,7 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    
+
                     // Concepts
                     if (session.concepts.isNotEmpty)
                       Text(
@@ -426,7 +487,7 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    
+
                     // Date
                     const SizedBox(height: 4),
                     Text(
@@ -438,12 +499,9 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
                   ],
                 ),
               ),
-              
+
               // More options
-              Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.outline,
-              ),
+              Icon(Icons.chevron_right, color: theme.colorScheme.outline),
             ],
           ),
         ),
@@ -454,7 +512,7 @@ class _SenseiLandingScreenState extends State<SenseiLandingScreen> {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays > 7) {
       return '${date.day}/${date.month}/${date.year}';
     } else if (difference.inDays >= 1) {

@@ -64,7 +64,7 @@ dependencies:
   
   # Media
   image_picker: ^1.0.7
-  file_picker: ^6.1.1
+  file_selector: ^1.0.3
   flutter_tts: ^3.8.5  # Text-to-speech functionality
   permission_handler: ^11.3.1
   

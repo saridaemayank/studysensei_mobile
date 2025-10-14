@@ -16,11 +16,14 @@ class FriendBloc extends Bloc<FriendEvent, FriendState> {
     on<_FriendsUpdated>(_onFriendsUpdated);
   }
 
-  Future<void> _onLoadFriends(LoadFriends event, Emitter<FriendState> emit) async {
+  Future<void> _onLoadFriends(
+    LoadFriends event,
+    Emitter<FriendState> emit,
+  ) async {
     try {
       print('Starting to load friends...');
       emit(FriendLoadInProgress());
-      
+
       final currentUserId = _auth.currentUser?.uid;
       if (currentUserId == null) {
         print('User not authenticated');
@@ -51,26 +54,33 @@ class FriendBloc extends Bloc<FriendEvent, FriendState> {
       // Fetch the actual user data for each friend
       final friendIds = friendsSnapshot.docs.map((doc) => doc.id).toList();
       print('Fetching data for friends: $friendIds');
-      
+
       final friendsData = await Future.wait(
-        friendIds.map((friendId) => _firestore
-            .collection('users')
-            .doc(friendId)
-            .get(const GetOptions(source: Source.serverAndCache))),
+        friendIds.map(
+          (friendId) => _firestore
+              .collection('users')
+              .doc(friendId)
+              .get(const GetOptions(source: Source.serverAndCache)),
+        ),
       );
 
       final friends = friendsData.where((doc) => doc.exists).map((doc) {
         final data = doc.data() ?? {};
         final friend = Friend(
           id: doc.id,
-          name: data['displayName'] ?? data['email']?.toString().split('@').first ?? 'Unknown',
+          name:
+              data['displayName'] ??
+              data['email']?.toString().split('@').first ??
+              'Unknown',
           email: data['email']?.toString() ?? '',
           photoUrl: data['photoURL']?.toString(),
         );
-        print('Created friend: ${friend.id} - ${friend.name} (${friend.email})');
+        print(
+          'Created friend: ${friend.id} - ${friend.name} (${friend.email})',
+        );
         return friend;
       }).toList();
-      
+
       print('Successfully loaded ${friends.length} friends');
       emit(FriendsLoadSuccess(friends));
 
@@ -82,9 +92,9 @@ class FriendBloc extends Bloc<FriendEvent, FriendState> {
           .collection('friends')
           .snapshots()
           .listen((_) {
-        // Force refresh from server when friends list changes
-        add(const LoadFriends(forceRefresh: true));
-      });
+            // Force refresh from server when friends list changes
+            add(const LoadFriends(forceRefresh: true));
+          });
     } catch (e, stackTrace) {
       print('Error loading friends: $e\n$stackTrace');
       // If we have cached data, keep showing it even if refresh fails

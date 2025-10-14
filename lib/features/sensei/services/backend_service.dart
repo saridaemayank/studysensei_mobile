@@ -31,28 +31,30 @@ class BackendService {
       if (userId == null) {
         throw Exception('User must be authenticated to upload videos');
       }
-      
+
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'videos/$userId/session_$timestamp.mp4';
-      
+
       print('📁 Uploading video to: $fileName');
       print('📂 Video path: ${videoFile.path}');
-      
+
       // Check if file exists and is not empty
       if (!await videoFile.exists()) {
         throw Exception('Video file does not exist at path: ${videoFile.path}');
       }
-      
+
       final fileSize = await videoFile.length();
       if (fileSize == 0) {
         throw Exception('Video file is empty (0 bytes)');
       }
-      
-      print('📏 File size: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB');
+
+      print(
+        '📏 File size: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB',
+      );
 
       // Get a reference to the location where we'll upload the file
       final storageRef = _storage.ref().child(fileName);
-      
+
       // Create file metadata including the content type
       final metadata = SettableMetadata(
         contentType: 'video/mp4',
@@ -65,7 +67,7 @@ class BackendService {
 
       // Start the upload
       final uploadTask = storageRef.putFile(videoFile, metadata);
-      
+
       // Listen to upload progress
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
         final progress = snapshot.bytesTransferred / snapshot.totalBytes;
@@ -75,12 +77,12 @@ class BackendService {
 
       // Wait for the upload to complete
       final taskSnapshot = await uploadTask;
-      
+
       // Get the download URL
       final downloadUrl = await taskSnapshot.ref.getDownloadURL();
       print('✅ Video uploaded successfully');
       print('🔗 Download URL: $downloadUrl');
-      
+
       // Return the download URL
       return downloadUrl;
     } catch (e, stackTrace) {
@@ -104,16 +106,18 @@ class BackendService {
       }
 
       print('🚀 Starting video processing for concept: $concept');
-      
+
       // Check if file exists and is readable
       if (!await videoFile.exists()) {
         throw Exception('Video file does not exist at path: ${videoFile.path}');
       }
-      
+
       final fileSize = await videoFile.length();
       print('📂 Video file path: ${videoFile.path}');
-      print('📏 File size: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB');
-      
+      print(
+        '📏 File size: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB',
+      );
+
       if (fileSize == 0) {
         throw Exception('Video file is empty (0 bytes)');
       }

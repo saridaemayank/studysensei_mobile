@@ -61,6 +61,8 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
   int _currentTabIndex = 0;
   late final TtsService _ttsService;
   String _currentContent = '';
+  bool _isTtsInitialized = false;
+  String? _ttsErrorMessage;
 
   // Track selected answers for each question
   final Map<int, int?> _selectedAnswers = {};
@@ -95,24 +97,77 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
   }
 
   Future<void> _initTts() async {
-    await _ttsService.init();
+    final initialized = await _ttsService.init();
+    if (!mounted) return;
+
+    if (!initialized) {
+      setState(() {
+        _isTtsInitialized = false;
+        _ttsErrorMessage = 'Unable to initialise text-to-speech.';
+      });
+      return;
+    }
+
+    await _applyPreferredVoiceSettings();
+
+    setState(() {
+      _isTtsInitialized = true;
+      _ttsErrorMessage = null;
+    });
+
+    _updateContentForCurrentTab();
+  }
+
+  Future<void> _applyPreferredVoiceSettings() async {
+    final languageCode = widget.session?.languageCode?.trim().isNotEmpty == true
+        ? widget.session!.languageCode!
+        : widget.language;
+    final voiceId = widget.session?.voiceId?.trim().isNotEmpty == true
+        ? widget.session!.voiceId!
+        : widget.voice;
+
+    String? error;
+
+    final normalizedLanguage = _normalizeLanguageCode(languageCode);
+
+    if (normalizedLanguage.isNotEmpty) {
+      final languageApplied = await _ttsService.setLanguage(normalizedLanguage);
+      if (!languageApplied) {
+        error = 'Selected language ($normalizedLanguage) is not supported.';
+      }
+    }
+
+    if (voiceId.isNotEmpty && voiceId != 'Default Voice') {
+      final voiceApplied = await _ttsService.setVoice(voiceId);
+      if (!voiceApplied) {
+        error = 'Selected voice is unavailable.';
+      }
+    }
+
     if (mounted) {
       setState(() {
-        // Update UI after TTS is initialized
+        _ttsErrorMessage = error;
       });
     }
   }
 
   void _updateContentForCurrentTab() {
     final content = _getCurrentContentForTTS();
-    if (content.isNotEmpty) {
+    if (mounted) {
       setState(() {
         _currentContent = content;
       });
-      // Auto-play for read tab
-      if (_currentTabIndex == 1) {
-        _ttsService.speak(_currentContent);
-      }
+    }
+
+    if (_currentTabIndex == 1) {
+      _ttsService.updateContent(content);
+    } else {
+      _ttsService.updateContent('');
+    }
+
+    if (content.isEmpty) {
+      _ttsService.stop();
+      return;
     }
   }
 
@@ -121,96 +176,86 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
     if (session == null) return '';
 
     switch (_currentTabIndex) {
-      case 0: // Overview
-        final content = <String>[];
-        if (session.title != null) content.add('Title: ${session.title}');
-        if (session.hook?.isNotEmpty ?? false) content.add(session.hook!);
-        if (session.concepts.isNotEmpty) {
-          content.add('Key concepts: ${session.concepts.join(', ')}');
-        }
-        if (session.analogy?.isNotEmpty ?? false) {
-          content.add('Analogy: ${session.analogy}');
-        }
-        return content.join('\n\n');
+      case 0: // Watch tab does not provide narration content
+        return '';
       case 1: // Read
-        final content = <String>[];
-        if (session.analysis?.isNotEmpty ?? false) {
-          content.add('Analysis: ${session.analysis}');
-        }
-        if (session.conceptMappings?.isNotEmpty ?? false) {
-          content.addAll(
-            session.conceptMappings!.map((mapping) {
-              return '${mapping['concept']}: ${mapping['explanation']}';
-            }),
-          );
+        final analysis = session.analysis;
+        if (analysis != null && analysis.trim().isNotEmpty) {
+          return _formatContentText(analysis).trim();
         }
         if (session.narrationScript?.isNotEmpty ?? false) {
-          content.add('Narration: ${session.narrationScript}');
+          return session.narrationScript!;
         }
-        return content.join('\n\n');
+        if (session.conceptMappings?.isNotEmpty ?? false) {
+          return session.conceptMappings!
+              .map((mapping) =>
+                  '${mapping['concept']}: ${mapping['explanation']}')
+              .join('\n\n');
+        }
+        return '';
       case 2: // Practice
-        return widget.session?.quizQuestions
-                ?.map((q) => q['question'])
-                .join('\n') ??
-            '';
-      case 3: // Summary
-        return widget.session?.conceptMappings
-                ?.map((m) => m['summary'])
-                .join('\n') ??
-            '';
+        return '';
+      case 3: // Reflect
+        return '';
       default:
         return '';
     }
   }
 
   void _handleTabSelection() {
-    if (_tabController.indexIsChanging) {
-      // Stop any ongoing speech when changing tabs
-      _ttsService.stop();
+    final newIndex = _tabController.index;
+    if (newIndex == _currentTabIndex) return;
 
-      setState(() {
-        _currentTabIndex = _tabController.index;
-      });
+    // Stop any ongoing speech when changing tabs
+    _ttsService.stop();
 
-      // Update content for the new tab
+    setState(() {
+      _currentTabIndex = newIndex;
+    });
+
+    // Update content for the new tab
+    _updateContentForCurrentTab();
+  }
+
+  @override
+  void didUpdateWidget(covariant SenseiGenerateScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.session?.id != oldWidget.session?.id) {
       _updateContentForCurrentTab();
     }
-  }
 
-  // Get the appropriate FAB icon based on TTS state
-  IconData _getFloatingActionIcon() {
-    if (_ttsService.isPlaying) return Icons.pause;
-    if (_ttsService.isPaused) return Icons.play_arrow;
-    return Icons.volume_up;
-  }
+    final newLanguage = widget.session?.languageCode ?? widget.language;
+    final oldLanguage = oldWidget.session?.languageCode ?? oldWidget.language;
 
-  // Get FAB tooltip text
-  String _getFloatingActionLabel() {
-    if (_ttsService.isPlaying) return 'Pause';
-    if (_ttsService.isPaused) return 'Resume';
-    return 'Listen';
-  }
-
-  // Handle FAB tap
-  void _onFloatingActionPressed() {
-    if (_ttsService.isPlaying) {
-      _ttsService.pause();
-    } else if (_ttsService.isPaused) {
-      _ttsService.resume();
-    } else {
-      _ttsService.speak(_currentContent);
+    if (_isTtsInitialized && newLanguage != oldLanguage) {
+      _ttsService.setLanguage(newLanguage);
     }
-    setState(() {}); // Rebuild to update the icon
+
+    final newVoice = widget.session?.voiceId ?? widget.voice;
+    final oldVoice = oldWidget.session?.voiceId ?? oldWidget.voice;
+
+    if (_isTtsInitialized &&
+        newVoice != oldVoice &&
+        newVoice.isNotEmpty &&
+        newVoice != 'Default Voice') {
+      _ttsService.setVoice(newVoice);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _ttsService.stop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
-    // Only show FAB for tabs that have TTS content
-    final showFloatingAction =
-        _currentTabIndex == 1 && _currentContent.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -259,14 +304,6 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
           _buildReflectTab(theme, colorScheme),
         ],
       ),
-      floatingActionButton: showFloatingAction
-          ? FloatingActionButton.extended(
-              onPressed: _onFloatingActionPressed,
-              icon: Icon(_getFloatingActionIcon()),
-              label: Text(_getFloatingActionLabel()),
-              tooltip: _getFloatingActionLabel(),
-            )
-          : null,
     );
   }
 
@@ -376,13 +413,13 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
           const SizedBox(height: 8),
           ...(session.concepts.isNotEmpty
               ? session.concepts
-                    .map(
-                      (concept) => _buildConceptItem(
-                        theme,
-                        session.concepts.indexOf(concept),
-                      ),
-                    )
-                    .toList()
+                  .map(
+                    (concept) => _buildConceptItem(
+                      theme,
+                      session.concepts.indexOf(concept),
+                    ),
+                  )
+                  .toList()
               : [
                   Text(
                     'No concepts available',
@@ -407,12 +444,30 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
     final hasAnalysis = widget.session?.analysis?.trim().isNotEmpty ?? false;
     final hasAnalogy = widget.session?.analogy?.trim().isNotEmpty ?? false;
     final hasSummary = widget.session?.summary?.trim().isNotEmpty ?? false;
+    final hasTtsContent = _currentContent.trim().isNotEmpty;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_ttsErrorMessage != null)
+            _buildTtsErrorBanner(theme)
+          else if (!_isTtsInitialized)
+            _buildTtsLoadingBanner(theme)
+          else
+            ValueListenableBuilder<TtsState>(
+              valueListenable: _ttsService.stateNotifier,
+              builder: (context, state, _) => _buildTtsControls(
+                theme,
+                colorScheme,
+                state,
+                hasTtsContent: hasTtsContent,
+              ),
+            ),
+
+          const SizedBox(height: 24),
+
           // Summary card
           Card(
             elevation: 0,
@@ -504,16 +559,8 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
 
           // Formulas
           const SizedBox(height: 24),
-          Text(
-            'Key Formulas',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildFormulaCard(theme, colorScheme),
 
-          const SizedBox(height: 80), // Space for FAB
+          const SizedBox(height: 48), // Bottom padding
         ],
       ),
     );
@@ -682,10 +729,290 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
             ),
           ],
 
-          const SizedBox(height: 80), // Space for FAB
+          const SizedBox(height: 48), // Bottom padding
         ],
       ),
     );
+  }
+
+  Widget _buildTtsControls(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    TtsState state, {
+    required bool hasTtsContent,
+  }) {
+    final primaryIcon = _getTtsPrimaryIcon(state);
+    final primaryLabel = _getTtsPrimaryLabel(state);
+    final statusLabel = hasTtsContent
+        ? _getTtsStatusLabel(state)
+        : 'Add an analysis to enable narration for this lesson.';
+    final canInteract = _isTtsInitialized && _currentContent.isNotEmpty;
+
+    final languageLabel = widget.session?.languageCode ?? widget.language;
+    final voiceLabel = widget.session?.voiceId ?? widget.voice;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.volume_up_outlined,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Listen to this lesson',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        statusLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: canInteract ? _handleTtsPrimaryAction : null,
+                  icon: Icon(primaryIcon),
+                  label: Text(primaryLabel),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                _buildTtsMetadataChip(
+                    theme, colorScheme, 'Language', languageLabel),
+                if (voiceLabel.isNotEmpty && voiceLabel != 'Default Voice')
+                  _buildTtsMetadataChip(
+                      theme, colorScheme, 'Voice', voiceLabel),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: canInteract && state != TtsState.stopped
+                      ? _stopTts
+                      : null,
+                  icon: const Icon(Icons.stop_circle_outlined),
+                  label: const Text('Stop'),
+                ),
+                if (state == TtsState.error)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: Text(
+                      _describeTtsError(_ttsService.lastError),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTtsErrorBanner(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.error),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            color: theme.colorScheme.error,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Text-to-speech unavailable',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _ttsErrorMessage ??
+                      'Something went wrong with the TTS service.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTtsLoadingBanner(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Preparing narration...',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTtsMetadataChip(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    String label,
+    String value,
+  ) {
+    return Chip(
+      backgroundColor: colorScheme.surfaceVariant,
+      label: Text(
+        '$label: $value',
+        style: theme.textTheme.bodySmall,
+      ),
+    );
+  }
+
+  IconData _getTtsPrimaryIcon(TtsState state) {
+    switch (state) {
+      case TtsState.playing:
+        return Icons.pause;
+      case TtsState.paused:
+        return Icons.play_arrow;
+      case TtsState.error:
+      case TtsState.stopped:
+        return Icons.volume_up;
+    }
+  }
+
+  String _getTtsPrimaryLabel(TtsState state) {
+    switch (state) {
+      case TtsState.playing:
+        return 'Pause';
+      case TtsState.paused:
+        return 'Resume';
+      case TtsState.error:
+      case TtsState.stopped:
+        return 'Listen';
+    }
+  }
+
+  String _getTtsStatusLabel(TtsState state) {
+    switch (state) {
+      case TtsState.playing:
+        return 'Playing narration';
+      case TtsState.paused:
+        return 'Paused';
+      case TtsState.stopped:
+        return 'Ready to narrate this lesson';
+      case TtsState.error:
+        return 'Unable to play narration';
+    }
+  }
+
+  String _describeTtsError(TtsError? error) {
+    switch (error) {
+      case TtsError.languageUnavailable:
+        return 'Selected language is not supported.';
+      case TtsError.voiceUnavailable:
+        return 'Selected voice is not available.';
+      case TtsError.notInitialized:
+        return 'TTS service is not ready.';
+      case TtsError.unknown:
+      case null:
+        return 'Something went wrong while playing audio.';
+    }
+  }
+
+  void _handleTtsPrimaryAction() {
+    if (_currentContent.isEmpty) return;
+
+    if (_currentTabIndex != 1) {
+      return;
+    }
+
+    if (_ttsService.isPlaying) {
+      _ttsService.pause();
+    } else if (_ttsService.isPaused) {
+      _ttsService.resume();
+    } else {
+      _ttsService.speak(_currentContent);
+    }
+  }
+
+  void _stopTts() {
+    _ttsService.stop();
+  }
+
+  String _normalizeLanguageCode(String raw) {
+    if (raw.isEmpty) return raw;
+    const languageFallbacks = {
+      'English': 'en-US',
+      'Spanish': 'es-ES',
+      'French': 'fr-FR',
+      'German': 'de-DE',
+      'Japanese': 'ja-JP',
+      'Hindi': 'hi-IN',
+      'Chinese': 'zh-CN',
+    };
+    return languageFallbacks[raw] ?? raw;
   }
 
   Widget _buildReflectTab(ThemeData theme, ColorScheme colorScheme) {
@@ -696,8 +1023,7 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
 
     final TextEditingController _reflectionController = TextEditingController();
 
-    final reflectionPrompt =
-        widget.reflectionPrompt ??
+    final reflectionPrompt = widget.reflectionPrompt ??
         'How can you apply the concepts you\'ve learned in this lesson to solve real-world problems? Provide specific examples and explain your reasoning.';
 
     return SingleChildScrollView(
@@ -976,11 +1302,10 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
                   final questions = widget.session?.quizQuestions ?? [];
                   final options = questionIndex < questions.length
                       ? (questions[questionIndex]?['options']
-                                as List<dynamic>?) ??
-                            []
+                              as List<dynamic>?) ??
+                          []
                       : [];
-                  final correctAnswerText =
-                      correctAnswerIndex >= 0 &&
+                  final correctAnswerText = correctAnswerIndex >= 0 &&
                           correctAnswerIndex < options.length
                       ? options[correctAnswerIndex].toString()
                       : 'the correct answer';
@@ -1003,8 +1328,8 @@ class _SenseiGenerateScreenState extends State<SenseiGenerateScreen>
         decoration: BoxDecoration(
           color: isSelected
               ? (isThisCorrect
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.red.withOpacity(0.1))
+                  ? Colors.green.withOpacity(0.1)
+                  : Colors.red.withOpacity(0.1))
               : colorScheme.surfaceVariant.withOpacity(0.3),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(

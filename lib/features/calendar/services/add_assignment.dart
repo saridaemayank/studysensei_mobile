@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
+import 'firebase_service.dart';
+
 class AddAssignmentPage extends StatefulWidget {
   @override
   _AddAssignmentPageState createState() => _AddAssignmentPageState();
@@ -17,7 +19,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
   final List<String> subjects = [];
   final Map<String, Color> subjectColors = {};
   String? _selectedSubject;
-  
+
   // Predefined colors for subjects
   final List<Color> _availableColors = [
     Colors.red,
@@ -31,17 +33,17 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
     Colors.cyan,
     Colors.indigo,
   ];
-  
+
   @override
   void initState() {
     super.initState();
     _loadSubjects();
   }
-  
+
   void _loadSubjects() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    
+
     FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
@@ -49,48 +51,43 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
         .orderBy('name')
         .snapshots()
         .listen((snapshot) {
-      if (mounted) {
-        setState(() {
-          subjects.clear();
-          for (var doc in snapshot.docs) {
-            final subject = doc['name'] as String? ?? '';
-            if (subject.isNotEmpty) {
-              subjects.add(subject);
-              // Assign a color if not already assigned
-              if (!subjectColors.containsKey(subject)) {
-                subjectColors[subject] = _availableColors[subjects.length % _availableColors.length];
+          if (mounted) {
+            setState(() {
+              subjects.clear();
+              for (var doc in snapshot.docs) {
+                final subject = doc['name'] as String? ?? '';
+                if (subject.isNotEmpty) {
+                  subjects.add(subject);
+                  // Assign a color if not already assigned
+                  if (!subjectColors.containsKey(subject)) {
+                    subjectColors[subject] =
+                        _availableColors[subjects.length %
+                            _availableColors.length];
+                  }
+                }
               }
-            }
-          }
-          
-          // Set the first subject as selected if none is selected
-          if (_selectedSubject == null && subjects.isNotEmpty) {
-            _selectedSubject = subjects.first;
+
+              // Set the first subject as selected if none is selected
+              if (_selectedSubject == null && subjects.isNotEmpty) {
+                _selectedSubject = subjects.first;
+              }
+            });
           }
         });
-      }
-    });
   }
 
   Future<void> _saveAssignment() async {
     if (_formKey.currentState!.validate() && _selectedSubject != null) {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      
+
       try {
-        // Save assignment in user's assignments subcollection
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('assignments')
-            .add({
-              'name': _nameController.text,
-              'subject': _selectedSubject,
-              'deadline': Timestamp.fromDate(_deadline),
-              'createdAt': FieldValue.serverTimestamp(),
-              'isCompleted': false,
-            });
-            
+        await FirebaseService.addAssignment(
+          name: _nameController.text,
+          subject: _selectedSubject!,
+          deadline: _deadline,
+        );
+
         if (mounted) {
           Navigator.pop(context, true);
         }
@@ -151,9 +148,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Assignment'),
-      ),
+      appBar: AppBar(title: const Text('Add Assignment')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -241,9 +236,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                           labelText: 'Time',
                           border: OutlineInputBorder(),
                         ),
-                        child: Text(
-                          DateFormat('h:mm a').format(_deadline),
-                        ),
+                        child: Text(DateFormat('h:mm a').format(_deadline)),
                       ),
                     ),
                   ),

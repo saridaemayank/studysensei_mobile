@@ -18,13 +18,18 @@ class UserListTile extends StatelessWidget {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: Theme.of(context).primaryColor.withOpacity(0.2),
-        child: Text(
-          user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-          style: TextStyle(
-            color: Theme.of(context).primaryColor,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
+            ? NetworkImage(user.photoUrl!)
+            : null,
+        child: (user.photoUrl == null || user.photoUrl!.isEmpty)
+            ? Text(
+                user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : null,
       ),
       title: Text(
         user.name,

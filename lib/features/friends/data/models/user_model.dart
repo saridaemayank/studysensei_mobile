@@ -7,6 +7,7 @@ class UserModel {
   final String? phone;
   final String? searchUid; // First 5 characters of UID for search
   final DateTime? createdAt;
+  final String? photoUrl;
 
   UserModel({
     required this.id,
@@ -15,6 +16,7 @@ class UserModel {
     this.phone,
     this.searchUid,
     this.createdAt,
+    this.photoUrl,
   });
 
   // Convert model to Firestore document
@@ -25,6 +27,7 @@ class UserModel {
       'phone': phone,
       'searchUid': searchUid ?? id.substring(0, 5).toLowerCase(),
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),
+      'photoUrl': photoUrl,
     };
   }
 
@@ -37,6 +40,7 @@ class UserModel {
       phone: map['phone'],
       searchUid: map['searchUid'] ?? id.substring(0, 5).toLowerCase(),
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
+      photoUrl: map['photoUrl']?.toString(),
     );
   }
 
@@ -47,6 +51,7 @@ class UserModel {
     String? phone,
     String? searchUid,
     DateTime? createdAt,
+    String? photoUrl,
   }) {
     return UserModel(
       id: id,
@@ -55,6 +60,7 @@ class UserModel {
       phone: phone ?? this.phone,
       searchUid: searchUid ?? this.searchUid,
       createdAt: createdAt ?? this.createdAt,
+      photoUrl: photoUrl ?? this.photoUrl,
     );
   }
 }

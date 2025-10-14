@@ -19,7 +19,6 @@ class _AssignmentPageState extends State<AssignmentPage> {
   final Map<DateTime, List<Map<String, dynamic>>> _events = {};
   final List<Map<String, dynamic>> _allAssignments = [];
   final List<Map<String, dynamic>> _selectedDayAssignments = [];
-  int _currentIndex = 0;
   late Stream<QuerySnapshot> _assignmentsStream;
 
   final Map<String, Color> subjectColors = {};
@@ -62,6 +61,8 @@ class _AssignmentPageState extends State<AssignmentPage> {
     _assignmentsStream.listen((snapshot) {
       if (mounted) {
         _updateAssignments(snapshot);
+        // Automatically cleanup past assignments when loading
+        _cleanupPastAssignments();
       }
     });
   }
@@ -83,19 +84,18 @@ class _AssignmentPageState extends State<AssignmentPage> {
         .orderBy('name')
         .snapshots()
         .listen((snapshot) {
-          if (mounted) {
-            setState(() {
-              for (var doc in snapshot.docs) {
-                final subject = doc['name'] as String? ?? '';
-                if (subject.isNotEmpty && !subjectColors.containsKey(subject)) {
-                  subjectColors[subject] =
-                      _availableColors[subjectColors.length %
-                          _availableColors.length];
-                }
-              }
-            });
+      if (mounted) {
+        setState(() {
+          for (var doc in snapshot.docs) {
+            final subject = doc['name'] as String? ?? '';
+            if (subject.isNotEmpty && !subjectColors.containsKey(subject)) {
+              subjectColors[subject] = _availableColors[
+                  subjectColors.length % _availableColors.length];
+            }
           }
         });
+      }
+    });
   }
 
   void _updateAssignments(QuerySnapshot snapshot) {
@@ -113,7 +113,12 @@ class _AssignmentPageState extends State<AssignmentPage> {
           final deadline = (data['deadline'] as Timestamp).toDate();
           final date = DateTime(deadline.year, deadline.month, deadline.day);
 
-          final assignment = {'id': doc.id, ...data, 'deadline': deadline};
+          final assignment = {
+            'id': doc.id,
+            ...data,
+            'deadline': deadline,
+            'completed': data['completed'] ?? false,
+          };
 
           _allAssignments.add(assignment);
           _events[date] = [..._events[date] ?? [], assignment];
@@ -147,6 +152,111 @@ class _AssignmentPageState extends State<AssignmentPage> {
 
   Color _getSubjectColor(String subject) {
     return subjectColors[subject] ?? Colors.grey;
+  }
+
+  // Function to check and delete past assignments
+  Future<void> _cleanupPastAssignments() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final now = DateTime.now();
+      final assignmentsRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('assignments');
+
+      // Get all assignments
+      final snapshot = await assignmentsRef.get();
+      final List<String> assignmentsToDelete = [];
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final deadline = data['deadline'] as Timestamp?;
+        final isCompleted = data['completed'] as bool? ?? false;
+
+        if (deadline != null) {
+          final deadlineDate = deadline.toDate();
+          // Only delete completed assignments that are past due (more than 1 day old)
+          // Keep incomplete assignments even if they're past due
+          if (isCompleted &&
+              deadlineDate.isBefore(now.subtract(const Duration(days: 1)))) {
+            assignmentsToDelete.add(doc.id);
+          }
+        }
+      }
+
+      // Delete expired assignments
+      if (assignmentsToDelete.isNotEmpty) {
+        final batch = FirebaseFirestore.instance.batch();
+
+        for (String assignmentId in assignmentsToDelete) {
+          batch.delete(assignmentsRef.doc(assignmentId));
+        }
+
+        await batch.commit();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Cleaned up ${assignmentsToDelete.length} completed assignment${assignmentsToDelete.length > 1 ? 's' : ''} past due',
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error cleaning up past assignments: $e');
+    }
+  }
+
+  // Function to toggle assignment completion status
+  Future<void> _toggleAssignmentCompletion(
+    Map<String, dynamic> assignment,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final assignmentId = assignment['id'] as String;
+      final currentStatus = assignment['completed'] as bool? ?? false;
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('assignments')
+          .doc(assignmentId)
+          .update({'completed': !currentStatus});
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              !currentStatus
+                  ? 'Assignment marked as completed!'
+                  : 'Assignment marked as incomplete!',
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: !currentStatus ? Colors.green : Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error updating assignment completion: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error updating assignment status'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -206,23 +316,68 @@ class _AssignmentPageState extends State<AssignmentPage> {
   }
 
   Widget _buildBody() {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (isLandscape) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return Row(
+            children: [
+              SizedBox(
+                width: constraints.maxWidth * 0.5,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildCalendar(),
+                      const SizedBox(height: 8),
+                      _buildAssignmentsHeader(),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    right: 8,
+                    top: 8,
+                    bottom: 8,
+                  ),
+                  child: _buildAssignmentList(),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
     return Column(
       children: [
         _buildCalendar(),
         const SizedBox(height: 8),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Assignments',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
+        _buildAssignmentsHeader(),
         const SizedBox(height: 8),
         Expanded(child: _buildAssignmentList()),
       ],
+    );
+  }
+
+  Widget _buildAssignmentsHeader() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'Assignments',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ),
     );
   }
 
@@ -297,41 +452,80 @@ class _AssignmentPageState extends State<AssignmentPage> {
         final assignment = _selectedDayAssignments[index];
         final subject = assignment['subject'] as String? ?? 'No Subject';
         final deadline = assignment['deadline'] as DateTime?;
+        final isCompleted = assignment['completed'] as bool? ?? false;
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           elevation: 2,
+          color: isCompleted ? Colors.grey[100] : null,
           child: ListTile(
             title: Text(
               assignment['name'] ?? 'No Name',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                decoration: isCompleted ? TextDecoration.lineThrough : null,
+                color: isCompleted ? Colors.grey[600] : null,
+              ),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                Text('Subject: $subject', style: const TextStyle(fontSize: 14)),
+                Text(
+                  'Subject: $subject',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isCompleted ? Colors.grey[500] : null,
+                  ),
+                ),
                 if (deadline != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     'Due: ${_formatDate(deadline)}',
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isCompleted ? Colors.grey[400] : Colors.grey,
+                    ),
+                  ),
+                ],
+                if (isCompleted) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Completed',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ],
             ),
             leading: CircleAvatar(
-              backgroundColor: _getSubjectColor(subject),
-              child: Text(
-                subject[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              backgroundColor:
+                  isCompleted ? Colors.grey[400] : _getSubjectColor(subject),
+              child: isCompleted
+                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                  : Text(
+                      subject[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
             onTap: () {
-              // Handle assignment tap
+              // You can add assignment details view here if needed
             },
           ),
         );
