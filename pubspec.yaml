@@ -2,7 +2,7 @@ name: study_sensei
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -37,46 +37,41 @@ dependencies:
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
   table_calendar: ^3.0.0
-  
+
   # Camera
   camera: ^0.11.0
-  
+
   # Firebase
-  firebase_core: ^2.32.0
-  firebase_messaging: ^14.9.4
-  cloud_firestore: ^4.15.3
-  firebase_auth: ^4.17.4
-  firebase_storage: ^11.6.0
-  
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
+  cloud_firestore: ^5.6.12
+  firebase_auth: ^5.7.0
+  firebase_storage: ^12.4.10
+
   # State Management
   bloc: ^8.1.4
   flutter_bloc: ^8.1.5
-  
+
   # Video Player
   video_player: ^2.8.3
   chewie: ^1.4.5
-  
+
   # Utils
   equatable: ^2.0.5
   dartz: ^0.10.1
   uuid: ^4.3.3
   shared_preferences: ^2.2.2
-  voxia:
-    path: VoxIA
-  record: ^5.2.1
-  flutter_sound: ^9.2.13
-  
+
   # Media
   image_picker: ^1.0.7
   file_selector: ^1.0.3
-  flutter_tts: ^3.8.5  # Text-to-speech functionality
+  flutter_tts: ^3.8.5 # Text-to-speech functionality
   permission_handler: ^11.3.1
-  
+
   # Network
   http: ^1.2.1
   path_provider: ^2.1.2
   video_thumbnail: ^0.5.3
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -89,16 +84,11 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 # Local overrides
-dependency_overrides:
-  record_linux:
-    path: third_party/record_linux
-
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
