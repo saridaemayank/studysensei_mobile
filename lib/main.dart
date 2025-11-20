@@ -1,26 +1,43 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 import 'package:study_sensei/features/auth/providers/user_provider.dart';
 import 'package:study_sensei/features/auth/login/screens/login_screen.dart';
+import 'package:study_sensei/features/auth/presentation/pages/phone_verification_screen.dart';
 import 'package:study_sensei/features/auth/register/screens/register_screen.dart';
 import 'package:study_sensei/features/auth/register/screens/subject_selection_screen.dart';
 import 'package:study_sensei/features/common/layouts/main_layout.dart';
 import 'package:study_sensei/features/friends/presentation/bloc/friend_bloc.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/group_bloc.dart';
+import 'package:study_sensei/core/navigation/navigation_service.dart';
+import 'package:study_sensei/core/services/push_notification_service.dart';
+import 'package:study_sensei/firebase_options.dart';
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } on FirebaseException catch (e) {
-    if (e.code == 'duplicate-app' || e.code == 'app/duplicate-app') {
-      Firebase.app();
-    } else {
+    if (e.code != 'duplicate-app' && e.code != 'app/duplicate-app') {
       rethrow;
     }
   }
+
+  await PushNotificationService.instance.initialize();
+
   runApp(const MyApp());
 }
 
@@ -46,6 +63,7 @@ class MyApp extends StatelessWidget {
             return MaterialApp(
               title: 'StudySensei',
               debugShowCheckedModeBanner: false,
+              navigatorKey: NavigationService.navigatorKey,
               theme: ThemeData(
                 primarySwatch: Colors.orange,
                 useMaterial3: true,
@@ -133,9 +151,11 @@ class MyApp extends StatelessWidget {
                 '/register': (context) => const RegisterScreen(),
                 '/assignments': (context) => const MainLayout(initialIndex: 1),
                 '/friends': (context) => const MainLayout(initialIndex: 2),
-                '/profile': (context) => const MainLayout(initialIndex: 3),
+                '/profile': (context) => const MainLayout(initialIndex: 4),
                 '/subject-selection': (context) =>
                     const SubjectSelectionScreen(),
+                PhoneVerificationScreen.routeName: (context) =>
+                    const PhoneVerificationScreen(),
               },
               onGenerateRoute: (settings) {
                 // Handle any other routes if needed

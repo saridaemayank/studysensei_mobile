@@ -6,14 +6,15 @@ import 'package:study_sensei/features/groups/presentation/pages/dojos_home_scree
 
 class CommunityScreen extends StatefulWidget {
   final String userId;
-  
+
   const CommunityScreen({super.key, required this.userId});
 
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProviderStateMixin {
+class _CommunityScreenState extends State<CommunityScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   SimpleGroupBloc? _groupBloc;
 
@@ -36,7 +37,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         surfaceTintColor: Colors.transparent,
@@ -46,7 +47,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
           'Community',
           style: TextStyle(
             fontFamily: 'DancingScript',
-            fontSize: 40,
+            fontSize: 36,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
           ),
@@ -76,7 +77,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
         children: [
           // Friends Tab
           FriendSearchScreen(showAppBar: false),
-          
+
           // Dojos Tab
           _groupBloc != null
               ? BlocProvider.value(

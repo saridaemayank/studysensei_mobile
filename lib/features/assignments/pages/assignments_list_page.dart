@@ -13,7 +13,6 @@ class AssignmentsListPage extends StatefulWidget {
 class _AssignmentsListPageState extends State<AssignmentsListPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  late Stream<QuerySnapshot> _assignmentsStream;
   final Map<String, Color> _subjectColors = {};
   final List<Color> _availableColors = [
     Colors.red,
@@ -27,25 +26,6 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
     Colors.cyan,
     Colors.indigo,
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAssignments();
-  }
-
-  void _loadAssignments() {
-    final user = _auth.currentUser;
-    if (user != null) {
-      _assignmentsStream = _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('assignments')
-          .orderBy('deadline')
-          .where('deadline', isGreaterThanOrEqualTo: DateTime.now())
-          .snapshots();
-    }
-  }
 
   Color _getSubjectColor(String subject) {
     if (!_subjectColors.containsKey(subject)) {
@@ -112,6 +92,29 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = _auth.currentUser;
+    final Stream<QuerySnapshot<Map<String, dynamic>>> assignmentsStream;
+    if (user == null) {
+      assignmentsStream = Stream<QuerySnapshot<Map<String, dynamic>>>.empty();
+    } else {
+      assignmentsStream = _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('assignments')
+          .orderBy('deadline')
+          .where('deadline', isGreaterThanOrEqualTo: DateTime.now())
+          .snapshots()
+          .handleError(
+        (error) {
+          if (error is FirebaseException &&
+              error.code == 'permission-denied') {
+            return;
+          }
+          debugPrint('Assignment stream error: $error');
+        },
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -125,8 +128,8 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
         backgroundColor: Colors.orange[100],
         elevation: 0,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _assignmentsStream,
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: assignmentsStream,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
@@ -138,7 +141,8 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final assignments = snapshot.data?.docs ?? [];
+          final assignments =
+              snapshot.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
           if (assignments.isEmpty) {
             return const Center(
@@ -158,7 +162,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
             itemCount: assignments.length,
             itemBuilder: (context, index) {
               final doc = assignments[index];
-              final assignment = doc.data() as Map<String, dynamic>;
+              final assignment = doc.data();
               final deadline = (assignment['deadline'] as Timestamp).toDate();
               final subject = assignment['subject'] ?? 'No Subject';
               final name = assignment['name'] ?? 'Untitled';

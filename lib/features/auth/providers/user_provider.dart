@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_preferences.dart';
+import 'package:study_sensei/core/services/push_notification_service.dart';
 
 class UserProvider with ChangeNotifier {
   User? _user;
@@ -21,8 +22,10 @@ class UserProvider with ChangeNotifier {
       _user = user;
       if (user != null) {
         await _loadUserPreferences(user.uid);
+        await PushNotificationService.instance.onUserSignedIn(user.uid);
       } else {
         _userPreferences = null;
+        PushNotificationService.instance.onUserSignedOut();
       }
       notifyListeners();
     });
@@ -39,10 +42,8 @@ class UserProvider with ChangeNotifier {
         _userPreferences = UserPreferences.fromMap(userDoc.data()!, userId);
       } else {
         // Fallback to userPreferences collection for backward compatibility
-        final prefsDoc = await _firestore
-            .collection('userPreferences')
-            .doc(userId)
-            .get();
+        final prefsDoc =
+            await _firestore.collection('userPreferences').doc(userId).get();
         if (prefsDoc.exists) {
           debugPrint('Firestore Preferences Data: ${prefsDoc.data()}');
           _userPreferences = UserPreferences.fromMap(prefsDoc.data()!, userId);
@@ -62,6 +63,7 @@ class UserProvider with ChangeNotifier {
   // Sign out - clears authentication and user data
   Future<void> signOut() async {
     try {
+      PushNotificationService.instance.onUserSignedOut();
       // Clear local state first
       _user = null;
       _userPreferences = null;
@@ -90,6 +92,8 @@ class UserProvider with ChangeNotifier {
     String? preferredTheme,
     bool? notificationsEnabled,
     String? photoUrl,
+    bool? phoneVerified,
+    String? phoneVerifiedAt,
   }) async {
     if (_userPreferences == null) return;
 
@@ -103,10 +107,44 @@ class UserProvider with ChangeNotifier {
       preferredTheme: preferredTheme,
       notificationsEnabled: notificationsEnabled,
       photoUrl: photoUrl,
+      phoneVerified: phoneVerified,
+      phoneVerifiedAt: phoneVerifiedAt,
     );
 
     await _savePreferences();
     notifyListeners();
+  }
+
+  Future<void> updateSubscriptionPlan(String plan) async {
+    final currentUser = _user;
+    if (currentUser == null) return;
+
+    _userPreferences =
+        (_userPreferences ?? UserPreferences(userId: currentUser.uid))
+            .copyWith(subscriptionPlan: plan);
+
+    try {
+      await Future.wait([
+        _firestore.collection('users').doc(currentUser.uid).set(
+          {
+            'subscriptionPlan': plan,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        ),
+        _firestore.collection('userPreferences').doc(currentUser.uid).set(
+          {
+            'subscriptionPlan': plan,
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        ),
+      ]);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating subscription plan: $e');
+      rethrow;
+    }
   }
 
   // Save preferences to Firestore
@@ -127,6 +165,13 @@ class UserProvider with ChangeNotifier {
   // Clear user data on logout
   void clearUser() {
     _userPreferences = null;
+    notifyListeners();
+  }
+
+  Future<void> refreshUserPreferences() async {
+    final currentUser = _user;
+    if (currentUser == null) return;
+    await _loadUserPreferences(currentUser.uid);
     notifyListeners();
   }
 

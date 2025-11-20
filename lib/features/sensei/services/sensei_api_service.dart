@@ -139,7 +139,10 @@ class SenseiApiService {
       if (kDebugMode) {
         print('Calling analyzeVideo function with URL: $url');
         print(
-          'Request headers: ${{'Content-Type': 'application/json', 'Authorization': 'Bearer $idToken'}}',
+          'Request headers: ${{
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $idToken'
+          }}',
         );
         print('Request body: ${jsonEncode(requestBody)}');
       }
@@ -190,6 +193,11 @@ class SenseiApiService {
         .collection('sessions')
         .orderBy('createdAt', descending: true)
         .snapshots()
+        .handleError(
+          (_) {},
+          test: (error) =>
+              error is FirebaseException && error.code == 'permission-denied',
+        )
         .map(
           (snapshot) => snapshot.docs
               .map(
@@ -225,16 +233,14 @@ class SenseiApiService {
 
       if (sessionData['createdAt'] != null &&
           sessionData['createdAt'] is Timestamp) {
-        sessionData['createdAt'] = (sessionData['createdAt'] as Timestamp)
-            .toDate()
-            .toIso8601String();
+        sessionData['createdAt'] =
+            (sessionData['createdAt'] as Timestamp).toDate().toIso8601String();
       }
 
       if (sessionData['updatedAt'] != null &&
           sessionData['updatedAt'] is Timestamp) {
-        sessionData['updatedAt'] = (sessionData['updatedAt'] as Timestamp)
-            .toDate()
-            .toIso8601String();
+        sessionData['updatedAt'] =
+            (sessionData['updatedAt'] as Timestamp).toDate().toIso8601String();
       }
 
       return SenseiSession.fromJson({...sessionData, 'id': doc.id, ...data});

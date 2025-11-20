@@ -16,7 +16,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
-  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -28,7 +27,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(automaticallyImplyLeading: false),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -41,8 +42,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Logo and Welcome Text
                 Column(
                   children: [
-                    // Replace with your app logo
-                    Image.asset('assets/images/logo.png', height: 80),
+                    // App logo with rounded corners
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        height: 90,
+                        width: 90,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                     const SizedBox(height: 16.0),
                     const Text(
                       'Welcome Back!',
@@ -55,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8.0),
                     Text(
-                      'Sign in to continue',
+                      'Your personal AI mentor awaits.',
                       style: Theme.of(
                         context,
                       ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
@@ -117,34 +126,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8.0),
 
-                // Remember Me & Forgot Password
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: _rememberMe,
-                          onChanged: (value) {
-                            setState(() {
-                              _rememberMe = value ?? false;
-                            });
-                          },
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        Text(
-                          'Remember me',
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(fontWeight: FontWeight.w500),
-                        ),
-                      ],
+                // Forgot Password
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _sendPasswordResetEmail,
+                    child: Text(
+                      'Forgot Password?',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(context).primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
                     ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 24.0),
 
@@ -170,13 +164,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24.0),
 
                 // Sign Up Link
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 4,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Don't have an account?",
+                      "Don't have an account? ",
                       style: Theme.of(
                         context,
                       ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
@@ -203,6 +195,47 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _sendPasswordResetEmail() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email to reset password.')),
+      );
+      return;
+    }
+
+    final emailPattern = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailPattern.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid email address.')),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset email sent to $email')),
+      );
+    } on FirebaseAuthException catch (e) {
+      final message = switch (e.code) {
+        'user-not-found' => 'No user found for that email.',
+        'invalid-email' => 'The email address is not valid.',
+        _ => 'Could not send reset email. Please try again.',
+      };
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('An unexpected error occurred.')),
+      );
+    }
+  }
+
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -222,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // No need to navigate here - the auth state listener in UserProvider will handle it
     } on FirebaseAuthException catch (e) {
-      String message = '$e';
+      String message = 'An error occurred. Please try again.';
 
       if (e.code == 'user-not-found' || e.code == 'wrong-password') {
         message = 'Invalid email or password.';
@@ -233,9 +266,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     } catch (e) {
       if (mounted) {

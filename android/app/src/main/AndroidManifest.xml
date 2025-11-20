@@ -14,11 +14,6 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- Media access for picking profile pictures -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
     <application
         android:label="Study Sensei"
         android:name="${applicationName}"
@@ -54,7 +49,7 @@
         <!-- Set custom default icon (optional) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/notification_icon" />
+            android:resource="@mipmap/ic_launcher" />
             
         <!-- Set color used with incoming notification messages (optional) -->
         <meta-data

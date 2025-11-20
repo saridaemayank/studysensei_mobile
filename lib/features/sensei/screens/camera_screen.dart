@@ -11,7 +11,7 @@ class CameraScreen extends StatefulWidget {
   final String concept;
 
   const CameraScreen({Key? key, required this.subject, required this.concept})
-    : super(key: key);
+      : super(key: key);
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -27,6 +27,7 @@ class _CameraScreenState extends State<CameraScreen> {
   double _uploadProgress = 0.0;
   Timer? _timer;
   List<CameraDescription> _cameras = [];
+  bool _cameraError = false;
 
   @override
   void initState() {
@@ -47,10 +48,16 @@ class _CameraScreenState extends State<CameraScreen> {
         enableAudio: true,
       );
       await _controller!.initialize();
-      setState(() => _isInitialized = true);
+      setState(() {
+        _isInitialized = true;
+        _cameraError = false;
+      });
     } catch (e) {
       if (mounted) {
-        _showError('Failed to initialize camera: $e');
+        _showError('Unable to access the camera. Please check permissions.');
+        setState(() {
+          _cameraError = true;
+        });
       }
     }
   }
@@ -183,8 +190,24 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildCameraPreview() {
-    if (!_isInitialized) {
+    if (!_isInitialized && !_cameraError) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_cameraError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.videocam_off, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Camera unavailable',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
     }
 
     return Stack(
@@ -260,13 +283,9 @@ class _CameraScreenState extends State<CameraScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isInitialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Record Your Lesson'),
+        title: const Text('Lesson Recorder'),
         actions: [
           if (_cameras.length > 1)
             IconButton(
@@ -275,31 +294,10 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          if (_isInitialized && _controller != null)
-            CameraPreview(_controller!),
-          if (_isProcessing)
-            Container(
-              color: Colors.black54,
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text(
-                      'Processing your video...\nThis may take a moment.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-      floatingActionButton: _isProcessing ? null : _buildFloatingActionButton(),
+      body: _buildCameraPreview(),
+      floatingActionButton: (!_isProcessing && _isInitialized)
+          ? _buildFloatingActionButton()
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }

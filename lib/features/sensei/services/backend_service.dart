@@ -8,12 +8,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/livekit_credentials.dart';
 import '../models/sensei_session.dart';
 
 /// Service class for handling backend operations with Firebase Cloud Functions
 class BackendService {
   static const String _baseUrl =
       'https://us-central1-study-sensei-53462.cloudfunctions.net/analyzeVideoWithMemory';
+  static const String _satoriSessionUrl =
+      'https://us-central1-study-sensei-53462.cloudfunctions.net/api/api/satori/token';
   // Firebase services
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -149,6 +152,69 @@ class BackendService {
     }
   }
 
+  /// Requests LiveKit connection credentials for the Satori doubt solver agent.
+  ///
+  /// The Cloud Function should:
+  ///  * validate the user's Firebase ID token
+  ///  * create or reuse a LiveKit room for the session
+  ///  * dispatch the Satori agent worker if needed
+  ///  * return a JSON payload with `url` and `token` fields
+  Future<LiveKitCredentials> createSatoriSession({
+    required String subject,
+    required String concept,
+    String? roomName,
+  }) async {
+    try {
+      final currentUser = user;
+      if (currentUser == null) {
+        throw Exception('You need to be signed in to start a Satori session.');
+      }
+
+      final displayName = currentUser.displayName?.trim();
+
+      final uri = Uri.parse(_satoriSessionUrl).replace(
+        queryParameters: {
+          'identity': currentUser.uid,
+          if (displayName != null && displayName.isNotEmpty)
+            'name': displayName,
+          'ttl': '3600',
+          'agent': 'false',
+          if (roomName != null && roomName.isNotEmpty) 'roomName': roomName,
+        },
+      );
+
+      final response = await http.get(uri);
+
+      if (response.statusCode != 200) {
+        throw HttpException(
+          'Failed to create Satori session (status ${response.statusCode})',
+        );
+      }
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Unexpected response format while creating Satori session.',
+        );
+      }
+
+      final success = decoded['success'];
+      if (success is bool && !success) {
+        final dispatch = decoded['dispatch'];
+        final message = dispatch is Map && dispatch['message'] is String
+            ? dispatch['message'] as String
+            : 'Failed to dispatch Satori agent.';
+        throw Exception(message);
+      }
+
+      return LiveKitCredentials.fromJson(decoded);
+    } catch (e, stackTrace) {
+      log('Failed to create Satori LiveKit session: $e',
+          stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
   /// Generates a lesson using the video URL and returns a session
   /// Extracts quiz questions from the API response
   List<Map<String, dynamic>> _extractQuizQuestions(dynamic data) {
@@ -167,9 +233,8 @@ class BackendService {
               'options': List<String>.from(
                 q['options']?.map((o) => o.toString().trim()) ?? [],
               ),
-              'correctAnswer': q['correctAnswer'] is int
-                  ? q['correctAnswer']
-                  : 0,
+              'correctAnswer':
+                  q['correctAnswer'] is int ? q['correctAnswer'] : 0,
               'explanation': q['explanation']?.toString().trim() ?? '',
             });
           }
@@ -183,9 +248,8 @@ class BackendService {
               'options': List<String>.from(
                 q['options']?.map((o) => o.toString().trim()) ?? [],
               ),
-              'correctAnswer': q['correctAnswer'] is int
-                  ? q['correctAnswer']
-                  : 0,
+              'correctAnswer':
+                  q['correctAnswer'] is int ? q['correctAnswer'] : 0,
               'explanation': q['explanation']?.toString().trim() ?? '',
             });
           }
@@ -348,8 +412,8 @@ class BackendService {
               'question': q['question']?.toString().trim() ?? 'No question',
               'options': (q['options'] is List)
                   ? (q['options'] as List)
-                        .map((e) => e.toString().trim())
-                        .toList()
+                      .map((e) => e.toString().trim())
+                      .toList()
                   : <String>[],
               'correctAnswer': correctAnswer,
               'explanation': q['explanation']?.toString().trim() ?? '',
@@ -469,9 +533,8 @@ class BackendService {
       if (uri.host.isNotEmpty && uri.path.isNotEmpty) {
         final bucket = uri.host.split('.').first;
         // Remove any query parameters and fragments
-        final path = uri.path.startsWith('/')
-            ? uri.path.substring(1)
-            : uri.path;
+        final path =
+            uri.path.startsWith('/') ? uri.path.substring(1) : uri.path;
         final gsUrl = 'gs://$bucket/$path';
         print('Converted to gs:// URL (fallback): $gsUrl');
         return gsUrl;

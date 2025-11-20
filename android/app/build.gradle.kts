@@ -23,7 +23,7 @@ android {
         applicationId = "com.mayank.study_sensei"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = flutter.versionCode?.toInt() ?: 1
+        versionCode = 12
         versionName = flutter.versionName
         multiDexEnabled = true
     }

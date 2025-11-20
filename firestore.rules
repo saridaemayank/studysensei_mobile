@@ -1,0 +1,289 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // --- Common helpers -----------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function groupDocPath(groupId) {
+      return /databases/$(database)/documents/groups/$(groupId);
+    }
+
+    function groupRecord(groupId) {
+      let path = groupDocPath(groupId);
+      return exists(path) ? get(path).data : null;
+    }
+
+    function isGroupMember(groupId) {
+      let group = groupRecord(groupId);
+      return isSignedIn() && group != null &&
+        group.memberIds is list &&
+        group.memberIds.hasAny([request.auth.uid]);
+    }
+
+    function isGroupAdmin(groupId) {
+      let group = groupRecord(groupId);
+      return isSignedIn() && group != null &&
+        group.adminIds is list &&
+        group.adminIds.hasAny([request.auth.uid]);
+    }
+
+    function isPublicGroup(groupId) {
+      let group = groupRecord(groupId);
+      return group != null && group.isPublic == true;
+    }
+
+    function validAssignmentStatus(status) {
+      return status in [
+        'AssignmentStatus.notStarted',
+        'AssignmentStatus.inProgress',
+        'AssignmentStatus.completed',
+        'notStarted',
+        'inProgress',
+        'completed'
+      ];
+    }
+
+    // --- Users collection and nested resources -----------------------------
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSelf(userId);
+      allow update, delete: if isSelf(userId);
+
+      match /subjects/{subjectId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /assignments/{assignmentId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /calendar_events/{eventId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /sessions/{sessionId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /friends/{friendId} {
+        allow read: if isSelf(userId);
+
+        allow create: if (
+            isSelf(userId) &&
+            request.resource.data.friendId == friendId &&
+            request.resource.data.keys().hasOnly(['friendId', 'since']) &&
+            request.resource.data.since == request.time
+          ) || (
+            isSignedIn() &&
+            request.auth.uid == request.resource.data.friendId &&
+            request.resource.data.friendId == friendId &&
+            request.resource.data.keys().hasOnly(['friendId', 'since']) &&
+            request.resource.data.since == request.time
+          );
+
+        allow update: if false; // friend docs are set-and-forget.
+
+        allow delete: if isSelf(userId) ||
+          (isSignedIn() && request.auth.uid == resource.data.friendId);
+      }
+
+      match /groups/{groupId} {
+        allow read: if isSelf(userId) || isGroupMember(groupId) || isPublicGroup(groupId);
+
+        allow create: if (
+            isSelf(userId) &&
+            request.resource.data.groupId == groupId &&
+            request.resource.data.keys().hasOnly(['groupId', 'joinedAt', 'isAdmin']) &&
+            request.resource.data.joinedAt == request.time
+          ) || (
+            isGroupAdmin(groupId) &&
+            request.resource.data.groupId == groupId &&
+            request.resource.data.keys().hasOnly(['groupId', 'joinedAt', 'isAdmin']) &&
+            request.resource.data.joinedAt == request.time
+          ) || (
+            groupRecord(groupId) == null &&
+            isSignedIn() &&
+            request.resource.data.groupId == groupId &&
+            request.resource.data.keys().hasOnly(['groupId', 'joinedAt', 'isAdmin']) &&
+            request.resource.data.joinedAt == request.time
+          );
+
+        allow update: if (
+            (isSelf(userId) || isGroupAdmin(groupId)) &&
+            request.resource.data.groupId == groupId &&
+            request.resource.data.keys().hasOnly(['groupId', 'joinedAt', 'isAdmin']) &&
+            request.resource.data.joinedAt == resource.data.joinedAt
+          );
+
+        allow delete: if isSelf(userId) || isGroupAdmin(groupId);
+      }
+    }
+
+    // --- Friend requests ----------------------------------------------------
+    match /friend_requests/{requestId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.fromUserId == request.auth.uid &&
+        request.resource.data.keys().hasOnly([
+          'fromUserId', 'toUserId', 'status', 'createdAt'
+        ]) &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.createdAt == request.time;
+
+      allow read: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+
+      allow update: if isSignedIn() &&
+        resource.data.toUserId == request.auth.uid &&
+        request.resource.data.keys().hasOnly([
+          'fromUserId', 'toUserId', 'status', 'createdAt', 'respondedAt'
+        ]) &&
+        request.resource.data.fromUserId == resource.data.fromUserId &&
+        request.resource.data.toUserId == resource.data.toUserId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.status in ['accepted', 'rejected'] &&
+        request.resource.data.respondedAt == request.time;
+
+      allow delete: if isSignedIn() && (
+        resource.data.fromUserId == request.auth.uid ||
+        resource.data.toUserId == request.auth.uid
+      );
+    }
+
+    // --- User preference documents -----------------------------------------
+    match /userPreferences/{userId} {
+      allow read, write: if isSelf(userId);
+    }
+
+    match /user_subjects/{userId} {
+      allow read, write: if isSelf(userId);
+    }
+
+    // --- Standalone assignments (public feed) -------------------------------
+    match /assignments/{assignmentId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow read, update, delete: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // --- Groups root collection ---------------------------------------------
+    match /groups/{groupId} {
+      allow get: if isSignedIn() && (
+        resource.data.isPublic == true ||
+        (resource.data.memberIds is list &&
+          resource.data.memberIds.hasAny([request.auth.uid]))
+      );
+
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.memberIds is list &&
+        request.resource.data.memberIds.hasAny([request.auth.uid]) &&
+        request.resource.data.adminIds is list &&
+        request.resource.data.adminIds.hasAny([request.auth.uid]) &&
+        request.resource.data.createdAt is timestamp;
+
+      allow update: if isGroupAdmin(groupId);
+      allow delete: if isGroupAdmin(groupId);
+
+      match /assignments/{assignmentId} {
+        allow read: if isGroupMember(groupId) || isGroupAdmin(groupId);
+
+        allow create: if isGroupAdmin(groupId) &&
+          request.resource.data.groupId == groupId;
+
+        allow delete: if isGroupAdmin(groupId);
+
+        allow update: if isGroupAdmin(groupId) ||
+          (
+            isGroupMember(groupId) &&
+            resource.data.groupId == groupId &&
+            request.resource.data.groupId == groupId &&
+            resource.data.diff(request.resource.data).changedKeys()
+              .hasOnly(['userCompletion', 'status', 'updatedAt']) &&
+            validAssignmentStatus(request.resource.data.status) &&
+            request.resource.data.userCompletion is map &&
+            request.resource.data.userCompletion[request.auth.uid] is bool &&
+            resource.data.userCompletion.diff(request.resource.data.userCompletion)
+              .changedKeys().hasOnly([request.auth.uid])
+          );
+      }
+
+      match /messages/{messageId} {
+        allow read: if isGroupMember(groupId) || isGroupAdmin(groupId);
+
+        allow create: if isGroupMember(groupId) &&
+          request.resource.data.groupId == groupId &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.keys().hasOnly([
+            'groupId',
+            'senderId',
+            'senderName',
+            'senderPhotoUrl',
+            'text',
+            'sentAt',
+            'editedAt'
+          ]) &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.sentAt == request.time &&
+          request.resource.data.editedAt == null;
+
+        allow update: if isGroupMember(groupId) &&
+          resource.data.senderId == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.keys().hasAll([
+            'groupId',
+            'senderId',
+            'senderName',
+            'senderPhotoUrl',
+            'text',
+            'sentAt',
+            'editedAt'
+          ]) &&
+          resource.data.diff(request.resource.data).changedKeys().hasOnly([
+            'text',
+            'editedAt'
+          ]) &&
+          request.resource.data.editedAt == request.time;
+
+        allow delete: if isGroupAdmin(groupId) ||
+          (isGroupMember(groupId) &&
+            resource.data.senderId == request.auth.uid);
+      }
+    }
+
+    // --- Legacy collection for shared group assignments ---------------------
+    match /group_assignments/{assignmentId} {
+      allow read: if isGroupMember(resource.data.groupId) ||
+        isGroupAdmin(resource.data.groupId);
+
+      allow create: if isGroupAdmin(request.resource.data.groupId);
+      allow delete: if isGroupAdmin(resource.data.groupId);
+
+      allow update: if isGroupAdmin(resource.data.groupId) ||
+        (
+          isGroupMember(resource.data.groupId) &&
+          resource.data.diff(request.resource.data).changedKeys()
+            .hasOnly(['submissions', 'updatedAt']) &&
+          request.resource.data.updatedAt is timestamp
+        );
+    }
+
+    // --- Default deny -------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

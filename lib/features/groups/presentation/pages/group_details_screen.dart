@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:study_sensei/features/groups/data/models/group_assignment_model.dart';
 import 'package:study_sensei/features/groups/data/models/group_model.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/assignment/assignment_bloc.dart';
 import 'package:study_sensei/features/groups/presentation/widgets/assignment_list.dart';
 import 'package:study_sensei/features/groups/presentation/widgets/add_assignment_dialog.dart';
+import 'package:study_sensei/core/services/push_notification_service.dart';
+import 'package:study_sensei/features/groups/presentation/widgets/group_chat_tab.dart';
+import 'package:study_sensei/features/auth/providers/user_provider.dart';
 
 class GroupDetailsScreen extends StatefulWidget {
   final Group group;
@@ -32,11 +36,12 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
   void initState() {
     super.initState();
     print('GroupDetailsScreen - initState');
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadMemberDetails();
 
     // Listen to tab changes
     _tabController.addListener(_handleTabChange);
+    PushNotificationService.instance.trackActiveGroup(widget.group.id);
   }
 
   Future<void> _loadMemberDetails() async {
@@ -59,6 +64,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
   void dispose() {
     _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
+    PushNotificationService.instance.trackActiveGroup(null);
     super.dispose();
   }
 
@@ -68,6 +74,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
     if (_tabController.index == 0) {
       _loadAssignments();
     }
+    setState(() {});
   }
 
   void _loadAssignments() {
@@ -90,7 +97,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
           }
         },
         child: DefaultTabController(
-          length: 2,
+          length: 3,
           child: Scaffold(
             appBar: AppBar(
               title: Text('${widget.group.name} Dojo'),
@@ -99,6 +106,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
                 tabs: const [
                   Tab(icon: Icon(Icons.assignment), text: 'Assignments'),
                   Tab(icon: Icon(Icons.people), text: 'Members'),
+                  Tab(icon: Icon(Icons.chat), text: 'Chat'),
                 ],
               ),
             ),
@@ -107,6 +115,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
               children: [
                 _buildAssignmentsTab(),
                 _buildMembersTab(),
+                _buildChatTab(context),
               ],
             ),
             floatingActionButton: _buildFloatingActionButton(),
@@ -199,6 +208,32 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
               : null,
         );
       },
+    );
+  }
+
+  Widget _buildChatTab(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final userPreferences = userProvider.userPreferences;
+    final memberData =
+        _membersCache[widget.currentUserId] as Map<String, dynamic>? ?? {};
+
+    final chatUserName = (userPreferences?.name?.trim().isNotEmpty ?? false)
+        ? userPreferences!.name!.trim()
+        : memberData['name']?.toString() ??
+            memberData['displayName']?.toString() ??
+            userProvider.user?.displayName ??
+            'Dojo Member';
+
+    final chatUserPhotoUrl = userPreferences?.photoUrl ??
+        memberData['photoUrl']?.toString() ??
+        userProvider.user?.photoURL;
+
+    return GroupChatTab(
+      groupId: widget.group.id,
+      currentUserId: widget.currentUserId,
+      currentUserName: chatUserName,
+      currentUserPhotoUrl: chatUserPhotoUrl,
+      isCurrentUserAdmin: widget.group.adminIds.contains(widget.currentUserId),
     );
   }
 

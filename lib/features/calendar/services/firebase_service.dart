@@ -13,11 +13,20 @@ class FirebaseService {
     return FirebaseFirestore.instance.collection('users');
   }
 
+  // Safe getter for current user's document reference
+  static DocumentReference<Map<String, dynamic>>? _userDocOrNull() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    return _usersCollection.doc(user.uid);
+  }
+
   // Get current user document reference
   static DocumentReference<Map<String, dynamic>> get _userDoc {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('User not logged in');
-    return _usersCollection.doc(user.uid);
+    final doc = _userDocOrNull();
+    if (doc == null) {
+      throw Exception('User not logged in');
+    }
+    return doc;
   }
 
   // Get current user's subjects subcollection reference
@@ -30,8 +39,20 @@ class FirebaseService {
       _userDoc.collection('assignments');
 
   // Get all assignments for current user
-  static Stream<QuerySnapshot> getAssignments() {
-    return _assignmentsCollection.orderBy('deadline').snapshots();
+  static Stream<QuerySnapshot<Map<String, dynamic>>> getAssignments() {
+    final doc = _userDocOrNull();
+    if (doc == null) {
+      return Stream<QuerySnapshot<Map<String, dynamic>>>.empty();
+    }
+    return doc
+        .collection('assignments')
+        .orderBy('deadline')
+        .snapshots()
+        .handleError(
+          (_) {},
+          test: (error) =>
+              error is FirebaseException && error.code == 'permission-denied',
+        );
   }
 
   // Add a new assignment for current user
@@ -93,17 +114,24 @@ class FirebaseService {
 
   // Get all subjects for current user
   static Stream<List<String>> getUserSubjects() {
-    try {
-      return _userSubjectsCollection
-          .orderBy('name')
-          .snapshots()
-          .map(
-            (snapshot) =>
-                snapshot.docs.map((doc) => doc['name'] as String).toList(),
-          );
-    } catch (e) {
+    final doc = _userDocOrNull();
+    if (doc == null) {
       return const Stream.empty();
     }
+
+    return doc
+        .collection('subjects')
+        .orderBy('name')
+        .snapshots()
+        .handleError(
+          (_) {},
+          test: (error) =>
+              error is FirebaseException && error.code == 'permission-denied',
+        )
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => doc['name'] as String).toList(),
+        );
   }
 
   // Update user data
@@ -147,7 +175,15 @@ class FirebaseService {
   }
 
   // Get user document
-  static Stream<DocumentSnapshot> getUserData() {
-    return _userDoc.snapshots();
+  static Stream<DocumentSnapshot<Map<String, dynamic>>> getUserData() {
+    final doc = _userDocOrNull();
+    if (doc == null) {
+      return Stream<DocumentSnapshot<Map<String, dynamic>>>.empty();
+    }
+    return doc.snapshots().handleError(
+          (_) {},
+          test: (error) =>
+              error is FirebaseException && error.code == 'permission-denied',
+        );
   }
 }

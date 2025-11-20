@@ -24,7 +24,8 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
   ];
 
   final List<String> _selectedSubjects = [];
-  final TextEditingController _customSubjectController = TextEditingController();
+  final TextEditingController _customSubjectController =
+      TextEditingController();
   final AuthService _authService = AuthService();
   bool _isLoading = false;
 
@@ -69,23 +70,27 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
       if (user != null) {
         // Create a batch to update user data and subjects
         final batch = FirebaseFirestore.instance.batch();
-        final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        final userRef =
+            FirebaseFirestore.instance.collection('users').doc(user.uid);
         final subjectsRef = userRef.collection('subjects');
-        
+
         // Update user document
-        batch.set(userRef, {
-          'name': user.displayName ?? '',
-          'email': user.email ?? '',
-          'grade': 'N/A',
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        
+        batch.set(
+            userRef,
+            {
+              'name': user.displayName ?? '',
+              'email': user.email ?? '',
+              'grade': 'N/A',
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true));
+
         // Clear existing subjects
         final existingSubjects = await subjectsRef.get();
         for (var doc in existingSubjects.docs) {
           batch.delete(doc.reference);
         }
-        
+
         // Add new subjects
         for (var subject in _selectedSubjects) {
           batch.set(subjectsRef.doc(), {
@@ -93,10 +98,10 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
             'createdAt': FieldValue.serverTimestamp(),
           });
         }
-        
+
         await batch.commit();
       }
-      
+
       if (mounted) {
         Navigator.pushReplacementNamed(context, AppRoutes.home);
       }
@@ -156,7 +161,8 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
                           decoration: const InputDecoration(
                             hintText: 'Add a custom subject',
                             border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12.0),
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 12.0),
                           ),
                           onFieldSubmitted: (_) => _addCustomSubject(),
                         ),

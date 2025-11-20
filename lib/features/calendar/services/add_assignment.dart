@@ -51,29 +51,28 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
         .orderBy('name')
         .snapshots()
         .listen((snapshot) {
-          if (mounted) {
-            setState(() {
-              subjects.clear();
-              for (var doc in snapshot.docs) {
-                final subject = doc['name'] as String? ?? '';
-                if (subject.isNotEmpty) {
-                  subjects.add(subject);
-                  // Assign a color if not already assigned
-                  if (!subjectColors.containsKey(subject)) {
-                    subjectColors[subject] =
-                        _availableColors[subjects.length %
-                            _availableColors.length];
-                  }
-                }
+      if (mounted) {
+        setState(() {
+          subjects.clear();
+          for (var doc in snapshot.docs) {
+            final subject = doc['name'] as String? ?? '';
+            if (subject.isNotEmpty) {
+              subjects.add(subject);
+              // Assign a color if not already assigned
+              if (!subjectColors.containsKey(subject)) {
+                subjectColors[subject] =
+                    _availableColors[subjects.length % _availableColors.length];
               }
+            }
+          }
 
-              // Set the first subject as selected if none is selected
-              if (_selectedSubject == null && subjects.isNotEmpty) {
-                _selectedSubject = subjects.first;
-              }
-            });
+          // Set the first subject as selected if none is selected
+          if (_selectedSubject == null && subjects.isNotEmpty) {
+            _selectedSubject = subjects.first;
           }
         });
+      }
+    });
   }
 
   Future<void> _saveAssignment() async {
@@ -249,14 +248,19 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                 child: ElevatedButton(
                   onPressed: _saveAssignment,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Save Assignment',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
                   ),
                 ),
               ),

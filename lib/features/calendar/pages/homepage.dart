@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:table_calendar/table_calendar.dart';
+
 import '../services/add_assignment.dart';
 
 class AssignmentPage extends StatefulWidget {
@@ -19,7 +22,12 @@ class _AssignmentPageState extends State<AssignmentPage> {
   final Map<DateTime, List<Map<String, dynamic>>> _events = {};
   final List<Map<String, dynamic>> _allAssignments = [];
   final List<Map<String, dynamic>> _selectedDayAssignments = [];
-  late Stream<QuerySnapshot> _assignmentsStream;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _assignmentsSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _subjectsSubscription;
+  StreamSubscription<User?>? _authSubscription;
+  bool _isLoadingAssignments = true;
 
   final Map<String, Color> subjectColors = {};
 
@@ -45,57 +53,120 @@ class _AssignmentPageState extends State<AssignmentPage> {
     _selectedDay = _focusedDay;
     _loadSubjects();
     _loadAssignments();
-  }
-
-  void _loadAssignments() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    _assignmentsStream = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('assignments')
-        .orderBy('deadline')
-        .snapshots();
-
-    _assignmentsStream.listen((snapshot) {
-      if (mounted) {
-        _updateAssignments(snapshot);
-        // Automatically cleanup past assignments when loading
-        _cleanupPastAssignments();
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted) return;
+      if (user == null) {
+        _assignmentsSubscription?.cancel();
+        _subjectsSubscription?.cancel();
+        setState(() {
+          _events.clear();
+          _allAssignments.clear();
+          _selectedDayAssignments.clear();
+          subjectColors.clear();
+          _isLoadingAssignments = false;
+        });
+      } else {
+        _loadAssignments();
+        _loadSubjects();
       }
     });
   }
 
+  void _loadAssignments() {
+    _assignmentsSubscription?.cancel();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          _events.clear();
+          _allAssignments.clear();
+          _selectedDayAssignments.clear();
+          _isLoadingAssignments = false;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _isLoadingAssignments = true;
+    });
+
+    _assignmentsSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('assignments')
+        .orderBy('deadline')
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (mounted) {
+          _updateAssignments(snapshot);
+          _cleanupPastAssignments();
+          _isLoadingAssignments = false;
+        }
+      },
+      onError: (error) {
+        if (error is FirebaseException && error.code == 'permission-denied') {
+          if (mounted) {
+            setState(() {
+              _isLoadingAssignments = false;
+            });
+          }
+          return;
+        }
+        debugPrint('Assignment listener error: $error');
+      },
+    );
+  }
+
   @override
   void dispose() {
+    _assignmentsSubscription?.cancel();
+    _subjectsSubscription?.cancel();
+    _authSubscription?.cancel();
     super.dispose();
   }
 
   // Load subjects and assign colors
   void _loadSubjects() {
+    _subjectsSubscription?.cancel();
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          subjectColors.clear();
+        });
+      }
+      return;
+    }
 
-    FirebaseFirestore.instance
+    _subjectsSubscription = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('subjects')
         .orderBy('name')
         .snapshots()
-        .listen((snapshot) {
-      if (mounted) {
-        setState(() {
-          for (var doc in snapshot.docs) {
-            final subject = doc['name'] as String? ?? '';
-            if (subject.isNotEmpty && !subjectColors.containsKey(subject)) {
-              subjectColors[subject] = _availableColors[
-                  subjectColors.length % _availableColors.length];
+        .listen(
+      (snapshot) {
+        if (mounted) {
+          setState(() {
+            for (var doc in snapshot.docs) {
+              final subject = doc['name'] as String? ?? '';
+              if (subject.isNotEmpty && !subjectColors.containsKey(subject)) {
+                subjectColors[subject] = _availableColors[
+                    subjectColors.length % _availableColors.length];
+              }
             }
-          }
-        });
-      }
-    });
+          });
+        }
+      },
+      onError: (error) {
+        if (error is FirebaseException && error.code == 'permission-denied') {
+          return;
+        }
+        debugPrint('Subject listener error: $error');
+      },
+    );
   }
 
   void _updateAssignments(QuerySnapshot snapshot) {
@@ -104,6 +175,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
     setState(() {
       _events.clear();
       _allAssignments.clear();
+      _isLoadingAssignments = false;
 
       for (var doc in snapshot.docs) {
         try {
@@ -265,31 +337,29 @@ class _AssignmentPageState extends State<AssignmentPage> {
       appBar: AppBar(
         surfaceTintColor: Colors.transparent,
         backgroundColor: Colors.orange[100],
-        elevation: 0, // Remove elevation from app bar
-        title: const Padding(
-          padding: EdgeInsets.only(bottom: 10), // Center the title
-          child: Text(
-            'StudySensei',
-            style: TextStyle(
-              fontFamily: 'DancingScript',
-              fontSize: 40, // Slightly smaller font size
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+        elevation: 0,
+        title: const Text(
+          'StudySensei',
+          style: TextStyle(
+            fontFamily: 'DancingScript',
+            fontSize: 36,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
           ),
         ),
+        centerTitle: true,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _assignmentsStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(child: Text('Error loading assignments'));
+      body: Builder(
+        builder: (context) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) {
+            return const Center(
+              child: Text('Sign in to view your assignments.'),
+            );
           }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (_isLoadingAssignments) {
             return const Center(child: CircularProgressIndicator());
           }
-
           return _buildBody();
         },
       ),
@@ -343,11 +413,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(
-                    right: 8,
-                    top: 8,
-                    bottom: 8,
-                  ),
+                  padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
                   child: _buildAssignmentList(),
                 ),
               ),

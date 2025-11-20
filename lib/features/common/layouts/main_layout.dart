@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:study_sensei/features/calendar/pages/homepage.dart';
-import 'package:study_sensei/features/assignments/pages/assignments_list_page.dart';
 import 'package:study_sensei/features/community/presentation/pages/community_screen.dart';
 import 'package:study_sensei/features/auth/presentation/pages/profile_screen.dart';
 import 'package:study_sensei/features/auth/providers/user_provider.dart';
 import 'package:study_sensei/features/sensei/screens/sensei_landing_screen.dart';
+import 'package:study_sensei/features/sensei/screens/satori_agent_screen.dart';
 
 class MainLayout extends StatefulWidget {
   final int initialIndex;
@@ -28,14 +28,14 @@ class _MainLayoutState extends State<MainLayout> {
       // Handle case where user is not available
       return;
     }
-    
+
     _userId = user.uid;
-    
+
     // Initialize screens with required dependencies
     if (_screens.isEmpty) {
       _screens.addAll([
         const AssignmentPage(),
-        const AssignmentsListPage(),
+        const SatoriAgentScreen(),
         CommunityScreen(userId: _userId),
         const SenseiLandingScreen(),
         const ProfileScreen(),
@@ -73,23 +73,23 @@ class _MainLayoutState extends State<MainLayout> {
   // Bottom navigation items
   List<BottomNavigationBarItem> get _bottomNavItems => [
         const BottomNavigationBarItem(
-          icon: Icon(Icons.home),
+          icon: Icon(Icons.home_rounded),
           label: 'Home',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.assignment),
-          label: 'Assignments',
+          icon: Icon(Icons.monitor_heart_rounded),
+          label: 'Satori',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.people_alt),
+          icon: Icon(Icons.people_alt_rounded),
           label: 'Community',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.school),
+          icon: Icon(Icons.school_rounded),
           label: 'Sensei',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.person),
+          icon: Icon(Icons.person_rounded),
           label: 'Profile',
         ),
       ];
@@ -100,26 +100,32 @@ class _MainLayoutState extends State<MainLayout> {
       onWillPop: _onWillPop,
       child: Scaffold(
         body: IndexedStack(index: _currentIndex, children: _screens),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
+        bottomNavigationBar: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BottomNavigationBar(
+                currentIndex: _currentIndex,
+                onTap: _onItemTapped,
+                type: BottomNavigationBarType.fixed,
+                backgroundColor: Colors.white,
+                items: _bottomNavItems,
+                selectedItemColor: Theme.of(context).primaryColor,
+                unselectedItemColor: Colors.grey,
+                showUnselectedLabels: true,
               ),
-            ],
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: _onItemTapped,
-            elevation: 10,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
-            items: _bottomNavItems,
-            selectedItemColor: Theme.of(context).primaryColor,
-            unselectedItemColor: Colors.grey,
-            showUnselectedLabels: true,
+            ),
           ),
         ),
       ),

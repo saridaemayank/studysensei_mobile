@@ -68,8 +68,7 @@ class FriendBloc extends Bloc<FriendEvent, FriendState> {
         final data = doc.data() ?? {};
         final friend = Friend(
           id: doc.id,
-          name:
-              data['displayName'] ??
+          name: data['displayName'] ??
               data['email']?.toString().split('@').first ??
               'Unknown',
           email: data['email']?.toString() ?? '',
@@ -91,10 +90,21 @@ class FriendBloc extends Bloc<FriendEvent, FriendState> {
           .doc(currentUserId)
           .collection('friends')
           .snapshots()
-          .listen((_) {
-            // Force refresh from server when friends list changes
-            add(const LoadFriends(forceRefresh: true));
-          });
+          .listen(
+        (_) {
+          // Force refresh from server when friends list changes
+          add(const LoadFriends(forceRefresh: true));
+        },
+        onError: (error, stackTrace) {
+          if (error is FirebaseException && error.code == 'permission-denied') {
+            print(
+              'FriendBloc listener permission denied. Waiting for access to be restored.',
+            );
+            return;
+          }
+          print('Error listening to friends updates: $error\n$stackTrace');
+        },
+      );
     } catch (e, stackTrace) {
       print('Error loading friends: $e\n$stackTrace');
       // If we have cached data, keep showing it even if refresh fails

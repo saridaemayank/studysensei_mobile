@@ -4,7 +4,7 @@ class UserPreferences {
   // Helper method to format date from dynamic type
   static String _formatDate(dynamic date) {
     if (date == null) return '';
-    
+
     if (date is Timestamp) {
       final dateTime = date.toDate();
       return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
@@ -15,6 +15,7 @@ class UserPreferences {
     }
     return date.toString();
   }
+
   final String? userId;
   final String? name;
   final String? email;
@@ -25,6 +26,9 @@ class UserPreferences {
   final String? preferredTheme;
   final bool? notificationsEnabled;
   final String? photoUrl;
+  final String subscriptionPlan;
+  final bool phoneVerified;
+  final String? phoneVerifiedAt;
 
   UserPreferences({
     this.userId,
@@ -37,6 +41,9 @@ class UserPreferences {
     this.preferredTheme = 'system',
     this.notificationsEnabled = true,
     this.photoUrl,
+    this.subscriptionPlan = 'free',
+    this.phoneVerified = false,
+    this.phoneVerifiedAt,
   });
 
   // Convert UserPreferences to a Map for Firestore
@@ -53,6 +60,9 @@ class UserPreferences {
       'notificationsEnabled': notificationsEnabled,
       'updatedAt': DateTime.now().toIso8601String(),
       'photoUrl': photoUrl,
+      'subscriptionPlan': subscriptionPlan,
+      'phoneVerified': phoneVerified,
+      'phoneVerifiedAt': phoneVerifiedAt,
     };
   }
 
@@ -61,8 +71,7 @@ class UserPreferences {
     print('Creating UserPreferences from map: $map');
 
     // Handle different field name variations
-    final name =
-        map['displayName'] ??
+    final name = map['displayName'] ??
         map['name'] ??
         '${map['firstName'] ?? ''} ${map['lastName'] ?? ''}'.trim();
     final email = map['email'] ?? '';
@@ -70,6 +79,18 @@ class UserPreferences {
     final dateOfBirth = map['dateOfBirth'] ?? map['dob'] ?? map['birthDate'];
     final gender = map['gender'] ?? '';
     final photoUrl = map['photoUrl'] ?? map['photoURL'] ?? map['avatarUrl'];
+    final subscriptionPlan = map['subscriptionPlan'] ??
+        map['plan'] ??
+        map['planTier'] ??
+        map['membership'] ??
+        'free';
+    final phoneVerified = map['phoneVerified'] == true;
+    final rawVerifiedAt = map['phoneVerifiedAt'];
+    String? phoneVerifiedAt;
+    if (rawVerifiedAt != null) {
+      phoneVerifiedAt =
+          rawVerifiedAt is Timestamp ? rawVerifiedAt.toDate().toIso8601String() : rawVerifiedAt.toString();
+    }
 
     return UserPreferences(
       userId: documentId,
@@ -82,9 +103,11 @@ class UserPreferences {
       preferredTheme: map['preferredTheme']?.toString() ?? 'system',
       notificationsEnabled: map['notificationsEnabled'] ?? true,
       photoUrl: photoUrl?.toString(),
+      subscriptionPlan: subscriptionPlan.toString(),
+      phoneVerified: phoneVerified,
+      phoneVerifiedAt: phoneVerifiedAt,
     );
   }
-
 
   // Create a copy of UserPreferences with some fields updated
   UserPreferences copyWith({
@@ -97,6 +120,9 @@ class UserPreferences {
     String? preferredTheme,
     bool? notificationsEnabled,
     String? photoUrl,
+    String? subscriptionPlan,
+    bool? phoneVerified,
+    String? phoneVerifiedAt,
   }) {
     return UserPreferences(
       userId: userId,
@@ -109,6 +135,9 @@ class UserPreferences {
       preferredTheme: preferredTheme ?? this.preferredTheme,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       photoUrl: photoUrl ?? this.photoUrl,
+      subscriptionPlan: subscriptionPlan ?? this.subscriptionPlan,
+      phoneVerified: phoneVerified ?? this.phoneVerified,
+      phoneVerifiedAt: phoneVerifiedAt ?? this.phoneVerifiedAt,
     );
   }
 }
