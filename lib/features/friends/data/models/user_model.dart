@@ -8,6 +8,8 @@ class UserModel {
   final String? searchUid; // First 5 characters of UID for search
   final DateTime? createdAt;
   final String? photoUrl;
+  final DateTime? dateOfBirth;
+  final String? gender;
 
   UserModel({
     required this.id,
@@ -17,6 +19,8 @@ class UserModel {
     this.searchUid,
     this.createdAt,
     this.photoUrl,
+    this.dateOfBirth,
+    this.gender,
   });
 
   // Convert model to Firestore document
@@ -28,19 +32,31 @@ class UserModel {
       'searchUid': searchUid ?? id.substring(0, 5).toLowerCase(),
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),
       'photoUrl': photoUrl,
+      'dateOfBirth': dateOfBirth,
+      'gender': gender,
     };
   }
 
   // Create model from Firestore document
   factory UserModel.fromMap(String id, Map<String, dynamic> map) {
+    DateTime? parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      return null;
+    }
+
     return UserModel(
       id: id,
       name: map['name'] ?? '',
       email: map['email'] ?? '',
       phone: map['phone'],
       searchUid: map['searchUid'] ?? id.substring(0, 5).toLowerCase(),
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
+      createdAt: parseDate(map['createdAt']),
       photoUrl: map['photoUrl']?.toString(),
+      dateOfBirth: parseDate(
+        map['dateOfBirth'] ?? map['dob'] ?? map['birthDate'],
+      ),
+      gender: map['gender']?.toString(),
     );
   }
 
@@ -52,6 +68,8 @@ class UserModel {
     String? searchUid,
     DateTime? createdAt,
     String? photoUrl,
+    DateTime? dateOfBirth,
+    String? gender,
   }) {
     return UserModel(
       id: id,
@@ -61,6 +79,8 @@ class UserModel {
       searchUid: searchUid ?? this.searchUid,
       createdAt: createdAt ?? this.createdAt,
       photoUrl: photoUrl ?? this.photoUrl,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
     );
   }
 }

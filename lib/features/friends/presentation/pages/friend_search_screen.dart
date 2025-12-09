@@ -4,6 +4,7 @@ import 'package:study_sensei/features/friends/presentation/bloc/friend_search/fr
 import 'package:study_sensei/features/friends/data/repositories/friend_repository_impl.dart';
 import 'package:study_sensei/features/friends/data/models/user_model.dart';
 import 'package:study_sensei/features/friends/presentation/widgets/user_list_tile.dart';
+import 'package:study_sensei/features/friends/presentation/pages/friend_detail_screen.dart';
 
 class FriendSearchScreen extends StatefulWidget {
   final bool showAppBar;
@@ -221,20 +222,37 @@ class _FriendSearchScreenState extends State<FriendSearchScreen>
             itemBuilder: (context, index) {
               final friend = friends[index];
               return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  child: Text(
-                    friend.name.isNotEmpty ? friend.name[0].toUpperCase() : '?',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
+                leading: _buildFriendAvatar(friend),
                 title: Text(friend.name),
                 subtitle: Text(friend.email),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FriendDetailScreen(friend: friend),
+                  ),
+                ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFriendAvatar(UserModel friend) {
+    final theme = Theme.of(context);
+    final photoUrl = friend.photoUrl;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return CircleAvatar(
+        backgroundImage: NetworkImage(photoUrl),
+        backgroundColor: Colors.transparent,
+      );
+    }
+    return CircleAvatar(
+      backgroundColor: theme.primaryColor,
+      child: Text(
+        friend.name.isNotEmpty ? friend.name[0].toUpperCase() : '?',
+        style: const TextStyle(color: Colors.white),
+      ),
     );
   }
 }

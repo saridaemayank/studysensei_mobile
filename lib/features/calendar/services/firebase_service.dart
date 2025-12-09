@@ -56,10 +56,13 @@ class FirebaseService {
   }
 
   // Add a new assignment for current user
-  static Future<void> addAssignment({
+  static Future<String> addAssignment({
     required String name,
     required String subject,
     required DateTime deadline,
+    int? estimatedMinutes,
+    String? goalId,
+    String? milestoneId,
   }) async {
     final user = currentUser;
     if (user == null) {
@@ -72,6 +75,10 @@ class FirebaseService {
       'deadline': Timestamp.fromDate(deadline),
       'isCompleted': false,
       'createdAt': FieldValue.serverTimestamp(),
+      'estimatedMinutes': estimatedMinutes,
+      'goalId': goalId,
+      'milestoneId': milestoneId,
+      'userId': user.uid,
     };
 
     final publicAssignmentData = {
@@ -89,6 +96,7 @@ class FirebaseService {
     batch.set(publicAssignmentRef, publicAssignmentData);
 
     await batch.commit();
+    return userAssignmentRef.id;
   }
 
   // Delete an assignment for current user

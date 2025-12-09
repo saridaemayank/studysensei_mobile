@@ -178,7 +178,8 @@ class BackendService {
           if (displayName != null && displayName.isNotEmpty)
             'name': displayName,
           'ttl': '3600',
-          'agent': 'false',
+          // Instruct backend to dispatch the Satori agent worker for this user.
+          'agent': 'true',
           if (roomName != null && roomName.isNotEmpty) 'roomName': roomName,
         },
       );

@@ -11,7 +11,9 @@ import 'package:study_sensei/features/auth/register/screens/subject_selection_sc
 import 'package:study_sensei/features/common/layouts/main_layout.dart';
 import 'package:study_sensei/features/friends/presentation/bloc/friend_bloc.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/group_bloc.dart';
+import 'package:study_sensei/features/home/services/study_session_notification_service.dart';
 import 'package:study_sensei/core/navigation/navigation_service.dart';
+import 'package:study_sensei/core/services/app_lock_provider.dart';
 import 'package:study_sensei/core/services/push_notification_service.dart';
 import 'package:study_sensei/firebase_options.dart';
 
@@ -37,6 +39,7 @@ Future<void> main() async {
   }
 
   await PushNotificationService.instance.initialize();
+  await StudySessionNotificationService.instance.ensureInitialized();
 
   runApp(const MyApp());
 }
@@ -50,6 +53,10 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (_) => UserProvider()..initAuth(),
+          lazy: false,
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AppLockProvider()..initialize(),
           lazy: false,
         ),
       ],

@@ -1,16 +1,34 @@
-# study_sensei
+# Study Sensei
 
-A new Flutter project.
+Cross-platform productivity platform built with Flutter. The codebase now
+targets Android, iOS, desktop, and Flutter Web so the same experience can be
+deployed to Firebase Hosting.
 
-## Getting Started
+## Prerequisites
 
-This project is a starting point for a Flutter application.
+- Flutter 3.35.x with web support enabled (`flutter config --enable-web`)
+- Firebase CLI (used for hosting deployments)
+- A configured Firebase project (`study-sensei-53462`) with Hosting enabled
 
-A few resources to get you started if this is your first Flutter project:
+## Local Development
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter pub get
+flutter run -d chrome # any supported device target works
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Building & Releasing The Web App
+
+1. Build the optimized Flutter Web bundle:
+   ```bash
+   flutter build web --release --web-renderer canvaskit
+   ```
+2. Copy (or move) `build/web` into `public/`. The Firebase Hosting config in
+   `firebase.json` points at this directory.
+3. Deploy to Firebase Hosting:
+   ```bash
+   firebase deploy --only hosting:studysensei-main
+   ```
+
+After deployment the latest web build is available at
+https://studysensei-main.web.app (or the custom domain mapped in Firebase).

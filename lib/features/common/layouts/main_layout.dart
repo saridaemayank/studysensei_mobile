@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:study_sensei/features/calendar/pages/homepage.dart';
 import 'package:study_sensei/features/community/presentation/pages/community_screen.dart';
 import 'package:study_sensei/features/auth/presentation/pages/profile_screen.dart';
 import 'package:study_sensei/features/auth/providers/user_provider.dart';
 import 'package:study_sensei/features/sensei/screens/sensei_landing_screen.dart';
 import 'package:study_sensei/features/sensei/screens/satori_agent_screen.dart';
+import 'package:study_sensei/features/home/data/repositories/home_repository.dart';
+import 'package:study_sensei/features/home/presentation/controller/home_view_model.dart';
+import 'package:study_sensei/features/home/presentation/pages/home_screen.dart';
 
 class MainLayout extends StatefulWidget {
   final int initialIndex;
@@ -34,7 +36,14 @@ class _MainLayoutState extends State<MainLayout> {
     // Initialize screens with required dependencies
     if (_screens.isEmpty) {
       _screens.addAll([
-        const AssignmentPage(),
+        ChangeNotifierProvider(
+          key: const ValueKey('home-screen'),
+          create: (_) => HomeViewModel(
+            repository: HomeRepository(),
+            userId: _userId,
+          ),
+          child: const HomeScreen(),
+        ),
         const SatoriAgentScreen(),
         CommunityScreen(userId: _userId),
         const SenseiLandingScreen(),

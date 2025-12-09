@@ -71,6 +71,22 @@ service cloud.firestore {
         allow read, write: if isSelf(userId);
       }
 
+      match /studyBlocks/{blockId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /studySessions/{sessionId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      match /longTermGoals/{goalId} {
+        allow read, write: if isSelf(userId);
+
+        match /milestones/{milestoneId} {
+          allow read, write: if isSelf(userId);
+        }
+      }
+
       match /friends/{friendId} {
         allow read: if isSelf(userId);
 
@@ -279,6 +295,14 @@ service cloud.firestore {
             .hasOnly(['submissions', 'updatedAt']) &&
           request.resource.data.updatedAt is timestamp
         );
+    }
+
+    // --- Global milestones collection group support ------------------------
+    match /{path=**}/milestones/{milestoneId} {
+      allow read: if isSignedIn() &&
+        request.auth.uid == resource.data.userId;
+      allow write: if isSignedIn() &&
+        request.auth.uid == request.resource.data.userId;
     }
 
     // --- Default deny -------------------------------------------------------

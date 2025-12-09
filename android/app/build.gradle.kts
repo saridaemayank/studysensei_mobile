@@ -23,7 +23,7 @@ android {
         applicationId = "com.mayank.study_sensei"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 12
+        versionCode = 15
         versionName = flutter.versionName
         multiDexEnabled = true
     }
@@ -53,6 +53,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -68,7 +69,9 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("androidx.cardview:cardview:1.0.0")
     // Add other Firebase dependencies as needed
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
 flutter {

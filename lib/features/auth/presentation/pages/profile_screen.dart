@@ -12,6 +12,7 @@ import 'package:study_sensei/features/common/widgets/premium_celebration_overlay
 import 'package:study_sensei/features/friends/data/models/friend_request_model.dart';
 import 'package:study_sensei/features/friends/data/repositories/friend_repository_impl.dart';
 import 'package:study_sensei/features/friends/domain/repositories/friend_repository.dart';
+import 'package:study_sensei/core/services/app_lock_provider.dart';
 import '../../models/user_preferences.dart';
 import '../../providers/user_provider.dart';
 import 'pending_requests_card.dart';
@@ -703,6 +704,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               usageLoading: _usageLoading,
               totalAllowance: _activeWeeklyAllowance,
               nextReset: _nextReset,
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'Focus Tools',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 16),
+            Consumer<AppLockProvider>(
+              builder: (context, appLock, _) {
+                if (appLock.isInitializing) {
+                  return const _AppLockLoadingCard();
+                }
+                if (!appLock.isSupported) {
+                  return const _AppLockUnsupportedCard();
+                }
+                unawaited(appLock.resetIfNewDay());
+                return _AppLockSettingsCard(provider: appLock);
+              },
             ),
           ],
         ),
@@ -1446,5 +1465,243 @@ class _WeeklyUsageCard extends StatelessWidget {
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds % 60;
     return '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
+  }
+}
+
+class _AppLockLoadingCard extends StatelessWidget {
+  const _AppLockLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: const [
+          CircularProgressIndicator(strokeWidth: 2.5),
+          SizedBox(width: 16),
+          Expanded(
+            child: Text('Preparing App Lock Mode...'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppLockUnsupportedCard extends StatelessWidget {
+  const _AppLockUnsupportedCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text('App Lock Mode is only available on Android devices.'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppLockSettingsCard extends StatelessWidget {
+  final AppLockProvider provider;
+
+  const _AppLockSettingsCard({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusText = provider.hasCompletedToday ? 'Completed' : 'Still pending';
+    final statusColor = provider.hasCompletedToday ? Colors.green : Colors.deepOrange;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'App Lock Mode',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Block Instagram, YouTube, Netflix, and other entertainment apps until today\'s Study Session is marked done.',
+                      style: TextStyle(height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: provider.isEnabled,
+                onChanged: provider.isInitializing
+                    ? null
+                    : (value) => provider.toggleAppLock(context, value),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _PermissionStatusRow(
+            label: 'Usage access',
+            granted: provider.hasUsagePermission,
+          ),
+          const SizedBox(height: 8),
+          _PermissionStatusRow(
+            label: 'Draw over apps',
+            granted: provider.hasOverlayPermission,
+          ),
+          if (provider.shouldShowPermissionWarning) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Text(
+                'Grant both permissions to keep entertainment apps blocked until you finish studying.',
+                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.deepOrange),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.event_available, color: statusColor),
+              const SizedBox(width: 8),
+              const Text('Today\'s Study Session: '),
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: statusColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Minimum study session',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${provider.minimumSessionMinutes} minutes',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                    ),
+                    Slider(
+                      min: 5,
+                      max: 180,
+                      divisions: 35,
+                      label: '${provider.minimumSessionMinutes} min',
+                      value: provider.minimumSessionMinutes.toDouble(),
+                      onChanged: (value) {
+                        final minutes = value.round();
+                        unawaited(provider.setMinimumSessionMinutes(minutes));
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => unawaited(provider.ensurePermissions(context)),
+                icon: const Icon(Icons.shield_outlined),
+                label: const Text('Manage permissions'),
+              ),
+              TextButton.icon(
+                onPressed: () => unawaited(provider.refreshPermissions()),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh status'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PermissionStatusRow extends StatelessWidget {
+  final String label;
+  final bool granted;
+
+  const _PermissionStatusRow({required this.label, required this.granted});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = granted ? Colors.green : Colors.redAccent;
+    final icon = granted ? Icons.check_circle : Icons.error_outline;
+    final status = granted ? 'Granted' : 'Required';
+
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label)),
+        Text(
+          status,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
+    );
   }
 }
