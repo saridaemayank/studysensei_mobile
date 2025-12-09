@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "studysensei-main",
+    "site": "study-sensei-main",
     "public": "public",
     "ignore": [
       "firebase.json",

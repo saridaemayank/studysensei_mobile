@@ -1,11 +1,11 @@
 {
-    "name": "study_sensei",
-    "short_name": "study_sensei",
+    "name": "Study Sensei",
+    "short_name": "StudySensei",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1F2933",
+    "theme_color": "#FF8A3C",
+    "description": "Study Sensei – focused study plans, AI-powered insights, and accountability for students.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
