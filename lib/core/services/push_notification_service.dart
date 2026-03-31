@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_sensei/core/navigation/navigation_service.dart';
@@ -27,6 +28,10 @@ class PushNotificationService {
   bool _permissionGranted = false;
   String? _currentUserId;
   RemoteMessage? _pendingNavigationMessage;
+  bool get _isApplePlatform =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
 
   /// Provide your Firebase web push certificate key if web push is used.
   /// It can also be injected at build time using `--dart-define=WEB_PUSH_KEY=<key>`.
@@ -108,6 +113,16 @@ class PushNotificationService {
         'PushNotificationService: No authenticated user for token registration.',
       );
       return;
+    }
+
+    if (token == null && _isApplePlatform) {
+      final apnsToken = await _messaging.getAPNSToken();
+      if (apnsToken == null || apnsToken.isEmpty) {
+        debugPrint(
+          'PushNotificationService: APNS token not available yet; will retry when FirebaseMessaging provides one.',
+        );
+        return;
+      }
     }
 
     final resolvedToken = token ??
@@ -267,4 +282,3 @@ class PushNotificationService {
     }
   }
 }
-
