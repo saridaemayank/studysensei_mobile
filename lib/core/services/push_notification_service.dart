@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -116,19 +117,40 @@ class PushNotificationService {
     }
 
     if (token == null && _isApplePlatform) {
-      final apnsToken = await _messaging.getAPNSToken();
-      if (apnsToken == null || apnsToken.isEmpty) {
-        debugPrint(
-          'PushNotificationService: APNS token not available yet; will retry when FirebaseMessaging provides one.',
-        );
-        return;
+      try {
+        final apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken == null || apnsToken.isEmpty) {
+          debugPrint(
+            'PushNotificationService: APNS token not available yet; will retry when FirebaseMessaging provides one.',
+          );
+          return;
+        }
+      } on FirebaseException catch (error) {
+        if (error.code == 'apns-token-not-set') {
+          debugPrint(
+            'PushNotificationService: APNS token missing (${error.code}); waiting for entitlement / registration.',
+          );
+          return;
+        }
+        rethrow;
       }
     }
 
-    final resolvedToken = token ??
-        await _messaging.getToken(
-          vapidKey: _webPushKey.isNotEmpty ? _webPushKey : null,
+    String? resolvedToken;
+    try {
+      resolvedToken = token ??
+          await _messaging.getToken(
+            vapidKey: _webPushKey.isNotEmpty ? _webPushKey : null,
+          );
+    } on FirebaseException catch (error) {
+      if (_isApplePlatform && error.code == 'apns-token-not-set') {
+        debugPrint(
+          'PushNotificationService: Skipping FCM registration until APNS token exists (${error.message}).',
         );
+        return;
+      }
+      rethrow;
+    }
 
     if (resolvedToken == null || resolvedToken.isEmpty) {
       debugPrint('PushNotificationService: Unable to obtain FCM token.');
