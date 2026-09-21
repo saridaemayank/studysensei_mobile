@@ -27,8 +27,8 @@ flutter run -d chrome # any supported device target works
    `firebase.json` points at this directory.
 3. Deploy to Firebase Hosting:
    ```bash
-   firebase deploy --only hosting:studysensei-main
+   firebase deploy --only hosting:study-sensei-main
    ```
 
 After deployment the latest web build is available at
-https://studysensei-main.web.app (or the custom domain mapped in Firebase).
+https://study-sensei-main.web.app (or the custom domain mapped in Firebase).
