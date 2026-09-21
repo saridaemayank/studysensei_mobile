@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/core/theme/app_typography.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_sensei/features/friends/data/models/friend_model.dart';
 import 'package:study_sensei/features/friends/presentation/bloc/friend_bloc.dart';
@@ -7,6 +9,8 @@ import 'package:study_sensei/features/friends/presentation/bloc/friend_state.dar
 import 'package:study_sensei/features/groups/data/enums/group_privacy.dart';
 import 'package:study_sensei/features/groups/data/models/group_model.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/group_bloc.dart';
+import 'package:study_sensei/features/common/widgets/sensei_card.dart';
+import 'package:study_sensei/features/common/widgets/sensei_primary_button.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final String userId;
@@ -34,19 +38,16 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void initState() {
     super.initState();
-    print('Initializing CreateGroupScreen with user ID: ${widget.userId}');
 
     // Load friends when the screen initializes
     final friendBloc = context.read<FriendBloc>();
 
     // Check if we already have friends loaded
     if (friendBloc.state is! FriendsLoadSuccess) {
-      print('No friends loaded yet, dispatching LoadFriends event');
       friendBloc.add(LoadFriends());
     } else {
       // If friends are already loaded, update the local state
       final state = friendBloc.state as FriendsLoadSuccess;
-      print('Friends already loaded: ${state.friends.length} friends');
       setState(() {
         _friends = state.friends;
       });
@@ -113,38 +114,37 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           } else if (state is GroupFailure) {
             setState(() => _isSubmitting = false);
             if (mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(state.errorMessage)));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Couldn't create your Dojo. Try again."),
+                ),
+              );
             }
           }
         },
         child: BlocConsumer<FriendBloc, FriendState>(
           listener: (context, state) {
             if (state is FriendsLoadSuccess) {
-              print('Friends loaded: ${state.friends.length} friends');
-              for (var friend in state.friends) {
-                print(
-                  'Friend - ID: ${friend.id}, Name: ${friend.name}, Email: ${friend.email}',
-                );
-              }
               setState(() {
                 _friends = state.friends;
               });
-            } else if (state is FriendOperationFailure) {
-              print('Error loading friends: ${state.message}');
-            }
+            } else if (state is FriendOperationFailure) {}
           },
           builder: (context, state) {
             // Show loading indicator if we're loading and don't have any friends yet
             if (state is FriendLoadInProgress && _friends.isEmpty) {
-              return const Center(
+              return Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading your friends to add to the dojo...'),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Loading friends...',
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -160,20 +160,20 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     children: [
                       const Icon(
                         Icons.error_outline,
-                        color: Colors.red,
+                        color: AppColors.error,
                         size: 48,
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        'Failed to load friends: ${state.message}',
+                      const Text(
+                        "Couldn’t load friends right now.",
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red),
+                        style: TextStyle(color: AppColors.error),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: () => context.read<FriendBloc>().add(
-                          const LoadFriends(forceRefresh: true),
-                        ),
+                              const LoadFriends(forceRefresh: true),
+                            ),
                         icon: const Icon(Icons.refresh),
                         label: const Text('Retry'),
                       ),
@@ -184,18 +184,28 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             }
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Dojo Name
+                    Text(
+                      'Start a study space',
+                      style: AppTypography.sectionTitle,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Create a clean place for questions, notes, and shared assignments.',
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     TextFormField(
                       controller: _nameController,
                       decoration: const InputDecoration(
-                        labelText: 'Dojo Name',
-                        border: OutlineInputBorder(),
+                        labelText: 'Dojo name',
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -205,201 +215,163 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       },
                     ),
                     const SizedBox(height: 16.0),
-
-                    // Description
                     TextFormField(
                       controller: _descriptionController,
                       decoration: const InputDecoration(
-                        labelText: 'Description (Optional)',
-                        border: OutlineInputBorder(),
+                        labelText: 'Description',
+                        hintText: 'What will this Dojo focus on?',
                       ),
                       maxLines: 3,
                     ),
-
-                    // Add Friends Section
                     const SizedBox(height: 24.0),
-                    // Friends Dropdown
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Add Friends to Group',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                    SenseiCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Invite your friends',
+                            style: AppTypography.cardTitle,
                           ),
-                        ),
-                        const SizedBox(height: 8.0),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey[300]!),
-                            borderRadius: BorderRadius.circular(8.0),
+                          const SizedBox(height: 8.0),
+                          Text(
+                            'You can add more people later.',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0,
-                            vertical: 4.0,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _selectedFriendId,
-                                    hint: const Text('Select a friend'),
-                                    isExpanded: true,
-                                    icon: const Icon(
-                                      Icons.arrow_drop_down,
-                                      size: 28,
-                                    ),
-                                    items: _friends.isEmpty
-                                        ? [
-                                            const DropdownMenuItem<String>(
-                                              value: null,
-                                              enabled: false,
-                                              child: Text(
-                                                'No friends available',
+                          const SizedBox(height: 14),
+                          Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.borderSubtle),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 4.0,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: _selectedFriendId,
+                                      itemHeight: null,
+                                      hint: const Text('Select a friend'),
+                                      isExpanded: true,
+                                      icon: const Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 28,
+                                      ),
+                                      items: _friends.isEmpty
+                                          ? [
+                                              const DropdownMenuItem<String>(
+                                                value: null,
+                                                enabled: false,
+                                                child: Text(
+                                                  'No friends available',
+                                                ),
                                               ),
-                                            ),
-                                          ]
-                                        : _friends
+                                            ]
+                                          : _friends
                                               .where(
-                                                (friend) => !_selectedMembers
-                                                    .contains(friend.id),
-                                              )
+                                              (friend) => !_selectedMembers
+                                                  .contains(friend.id),
+                                            )
                                               .map<DropdownMenuItem<String>>((
-                                                friend,
-                                              ) {
-                                                return DropdownMenuItem<String>(
-                                                  value: friend.id,
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Text(
-                                                        friend.name.isNotEmpty
-                                                            ? friend.name
-                                                            : 'Unknown',
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                        ),
+                                              friend,
+                                            ) {
+                                              return DropdownMenuItem<String>(
+                                                value: friend.id,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      friend.name.isNotEmpty
+                                                          ? friend.name
+                                                          : 'Unknown',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w500,
                                                       ),
-                                                      Text(
-                                                        friend.email,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color:
-                                                              Colors.grey[600],
-                                                        ),
+                                                    ),
+                                                    Text(
+                                                      friend.email,
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        color: AppColors
+                                                            .textSecondary,
                                                       ),
-                                                    ],
-                                                  ),
-                                                );
-                                              })
-                                              .toList(),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _selectedFriendId = value;
-                                      });
-                                    },
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _selectedFriendId = value;
+                                        });
+                                      },
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8.0),
-                              IconButton(
-                                onPressed: _selectedFriendId != null
-                                    ? _addSelectedFriend
-                                    : null,
-                                icon: const Icon(
-                                  Icons.add_circle_outline,
-                                  size: 28,
+                                const SizedBox(width: 8.0),
+                                IconButton(
+                                  onPressed: _selectedFriendId != null
+                                      ? _addSelectedFriend
+                                      : null,
+                                  icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    size: 28,
+                                  ),
+                                  tooltip: 'Add friend',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                      minWidth: 48, minHeight: 48),
                                 ),
-                                tooltip: 'Add friend',
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          if (_selectedMembers.isNotEmpty) ...[
+                            const SizedBox(height: 16.0),
+                            const Text(
+                              'Selected members',
+                              style: AppTypography.caption,
+                            ),
+                            const SizedBox(height: 8.0),
+                            Wrap(
+                              spacing: 8.0,
+                              runSpacing: 8.0,
+                              children: _selectedMembers.map((memberId) {
+                                final friend = _friends.firstWhere(
+                                  (f) => f.id == memberId,
+                                  orElse: () => Friend(
+                                    id: memberId,
+                                    name: 'Loading...',
+                                    email: '',
+                                  ),
+                                );
+                                return Chip(
+                                  label: Text(friend.name),
+                                  deleteIcon: const Icon(Icons.close, size: 16),
+                                  onDeleted: () {
+                                    setState(() {
+                                      _selectedMembers.remove(memberId);
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-
-                    // Selected members chips
-                    if (_selectedMembers.isNotEmpty) ...[
-                      const SizedBox(height: 12.0),
-                      const Text(
-                        'Selected Members:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8.0),
-                      Container(
-                        padding: const EdgeInsets.all(8.0),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                        child: Wrap(
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: _selectedMembers.map((memberId) {
-                            final friend = _friends.firstWhere(
-                              (f) => f.id == memberId,
-                              orElse: () => Friend(
-                                id: memberId,
-                                name: 'Loading...',
-                                email: '',
-                              ),
-                            );
-                            return Container(
-                              margin: const EdgeInsets.only(
-                                right: 4.0,
-                                bottom: 4.0,
-                              ),
-                              child: Chip(
-                                label: Text(
-                                  friend.name,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                deleteIcon: const Icon(Icons.close, size: 16),
-                                onDeleted: () {
-                                  setState(() {
-                                    _selectedMembers.remove(memberId);
-                                  });
-                                },
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                      const SizedBox(height: 16.0),
-                    ],
-
-                    // Create Dojo Button
                     const SizedBox(height: 24.0),
-                    ElevatedButton(
+                    SenseiPrimaryButton(
+                      text: 'Create Dojo',
                       onPressed: _isSubmitting ? null : _createGroup,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16.0),
-                        textStyle: const TextStyle(fontSize: 16.0),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Text('Create Dojo'),
                     ),
                   ],
                 ),

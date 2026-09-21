@@ -46,9 +46,7 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
     );
 
     _groupsSubscription?.cancel();
-    _groupsSubscription = groupRepository
-        .getUserGroups(event.userId)
-        .listen(
+    _groupsSubscription = groupRepository.getUserGroups(event.userId).listen(
           (groups) => emit(
             GroupsLoadSuccess(
               groups,
@@ -175,9 +173,9 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
             return g.id == event.group.id ? event.group : g;
           }).toList();
 
-          final updatedSelectedGroup = 
-              currentState.selectedGroup?.id == event.group.id 
-                  ? event.group 
+          final updatedSelectedGroup =
+              currentState.selectedGroup?.id == event.group.id
+                  ? event.group
                   : currentState.selectedGroup;
 
           emit(
@@ -230,8 +228,8 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
           final updatedGroups = currentState.groups
               .where((group) => group.id != event.groupId)
               .toList();
-          
-          final updatedSelectedGroup = 
+
+          final updatedSelectedGroup =
               currentState.selectedGroup?.id == event.groupId
                   ? null
                   : currentState.selectedGroup;
@@ -479,7 +477,7 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
     Emitter<GroupState> emit,
   ) async {
     final currentState = state;
-    
+
     if (event.query.isEmpty) {
       emit(
         GroupSearchResults(
@@ -516,7 +514,7 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
           );
         },
       );
-      
+
       // Cancel the subscription when the method is called again
       await subscription.asFuture();
       await subscription.cancel();
@@ -547,7 +545,7 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
     Emitter<GroupState> emit,
   ) async {
     final currentState = state;
-    
+
     // Handle the result without awaiting the fold directly
     result.fold(
       (failure) {
@@ -565,11 +563,13 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
         // to get the latest data from the server
         if (currentState.selectedGroup != null) {
           try {
-            final groupResult = await groupRepository.getGroup(currentState.selectedGroup!.id);
+            final groupResult =
+                await groupRepository.getGroup(currentState.selectedGroup!.id);
             groupResult.fold(
               (failure) => emit(
                 GroupFailure(
-                  errorMessage: 'Operation successful but failed to refresh group: ${failure.message}',
+                  errorMessage:
+                      'Operation successful but failed to refresh group: ${failure.message}',
                   groups: currentState.groups,
                   selectedGroup: currentState.selectedGroup,
                   searchResults: currentState.searchResults,
@@ -580,7 +580,7 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
                 final updatedGroups = currentState.groups.map((g) {
                   return g.id == updatedGroup.id ? updatedGroup : g;
                 }).toList();
-                
+
                 emit(
                   GroupOperationSuccess(
                     message: successMessage,
@@ -594,7 +594,8 @@ class GroupBloc extends Bloc<GroupEvent, GroupState> {
           } catch (e) {
             emit(
               GroupFailure(
-                errorMessage: 'Operation successful but failed to refresh group: $e',
+                errorMessage:
+                    'Operation successful but failed to refresh group: $e',
                 groups: currentState.groups,
                 selectedGroup: currentState.selectedGroup,
                 searchResults: currentState.searchResults,

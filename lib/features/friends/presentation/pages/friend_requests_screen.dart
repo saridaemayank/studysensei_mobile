@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_sensei/features/friends/data/repositories/friend_repository_impl.dart';
 import 'package:study_sensei/features/friends/presentation/bloc/friend_requests/friend_requests_bloc.dart';
 
 class FriendRequestsScreen extends StatelessWidget {
-  const FriendRequestsScreen({Key? key}) : super(key: key);
+  const FriendRequestsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +33,7 @@ class FriendRequestsScreen extends StatelessWidget {
                     leading: CircleAvatar(
                       backgroundColor: Theme.of(
                         context,
-                      ).primaryColor.withOpacity(0.2),
+                      ).primaryColor.withValues(alpha: 0.2),
                       child: Text(
                         request.senderName.isNotEmpty
                             ? request.senderName[0].toUpperCase()
@@ -43,15 +44,18 @@ class FriendRequestsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    title: Text(request.senderName),
-                    subtitle: Text(request.senderEmail),
+                    title: Text(request.senderName,
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(request.senderEmail,
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
+                          tooltip: 'Accept request',
                           icon: const Icon(
                             Icons.check_circle,
-                            color: Colors.green,
+                            color: AppColors.success,
                           ),
                           onPressed: () => _respondToRequest(
                             context,
@@ -61,7 +65,9 @@ class FriendRequestsScreen extends StatelessWidget {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.cancel, color: Colors.red),
+                          tooltip: 'Decline request',
+                          icon:
+                              const Icon(Icons.cancel, color: AppColors.error),
                           onPressed: () => _respondToRequest(
                             context,
                             request.requestId,
@@ -75,7 +81,9 @@ class FriendRequestsScreen extends StatelessWidget {
                 },
               );
             } else if (state is FriendRequestsError) {
-              return Center(child: Text('Error: ${state.message}'));
+              return Center(
+                  child: const Text(
+                      "Couldn't load this right now. Please try again."));
             }
             return const SizedBox.shrink();
           },
@@ -91,12 +99,12 @@ class FriendRequestsScreen extends StatelessWidget {
     String senderId,
   ) {
     context.read<FriendRequestsBloc>().add(
-      RespondToFriendRequest(
-        requestId: requestId,
-        isAccepted: isAccepted,
-        senderId: senderId,
-      ),
-    );
+          RespondToFriendRequest(
+            requestId: requestId,
+            isAccepted: isAccepted,
+            senderId: senderId,
+          ),
+        );
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -107,89 +115,3 @@ class FriendRequestsScreen extends StatelessWidget {
     );
   }
 }
-
-// Add these to your friend_requests_bloc.dart file if not already present
-/*
-abstract class FriendRequestsEvent extends Equatable {
-  const FriendRequestsEvent();
-  @override
-  List<Object> get props => [];
-}
-
-class LoadFriendRequests extends FriendRequestsEvent {}
-
-class RespondToFriendRequest extends FriendRequestsEvent {
-  final String requestId;
-  final bool isAccepted;
-  final String senderId;
-
-  const RespondToFriendRequest({
-    required this.requestId,
-    required this.isAccepted,
-    required this.senderId,
-  });
-
-  @override
-  List<Object> get props => [requestId, isAccepted, senderId];
-}
-
-abstract class FriendRequestsState extends Equatable {
-  const FriendRequestsState();
-  @override
-  List<Object> get props => [];
-}
-
-class FriendRequestsLoading extends FriendRequestsState {}
-
-class FriendRequestsLoaded extends FriendRequestsState {
-  final List<FriendRequestModel> requests;
-  const FriendRequestsLoaded(this.requests);
-  @override
-  List<Object> get props => [requests];
-}
-
-class FriendRequestsError extends FriendRequestsState {
-  final String message;
-  const FriendRequestsError(this.message);
-  @override
-  List<Object> get props => [message];
-}
-
-class FriendRequestsBloc extends Bloc<FriendRequestsEvent, FriendRequestsState> {
-  final FriendRepository friendRepository;
-
-  FriendRequestsBloc({required this.friendRepository}) : super(FriendRequestsLoading()) {
-    on<LoadFriendRequests>(_onLoadFriendRequests);
-    on<RespondToFriendRequest>(_onRespondToFriendRequest);
-  }
-
-  Future<void> _onLoadFriendRequests(
-    LoadFriendRequests event,
-    Emitter<FriendRequestsState> emit,
-  ) async {
-    try {
-      final requests = await friendRepository.getFriendRequests();
-      emit(FriendRequestsLoaded(requests));
-    } catch (e) {
-      emit(FriendRequestsError('Failed to load friend requests'));
-    }
-  }
-
-  Future<void> _onRespondToFriendRequest(
-    RespondToFriendRequest event,
-    Emitter<FriendRequestsState> emit,
-  ) async {
-    try {
-      await friendRepository.respondToFriendRequest(
-        requestId: event.requestId,
-        isAccepted: event.isAccepted,
-        senderId: event.senderId,
-      );
-      // Reload requests after responding
-      add(LoadFriendRequests());
-    } catch (e) {
-      // Handle error
-    }
-  }
-}
-*/

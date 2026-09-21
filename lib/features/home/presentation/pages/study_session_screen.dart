@@ -105,8 +105,7 @@ class _StudySessionScreenState extends State<StudySessionScreen>
               _plannedDuration.inMinutes;
       final storedActualMinutes =
           (existingData['actualDurationMinutes'] as int?) ?? 0;
-      final normalizedPlanned =
-          Duration(minutes: max(storedPlannedMinutes, 1));
+      final normalizedPlanned = Duration(minutes: max(storedPlannedMinutes, 1));
       final clampedActualMinutes =
           storedActualMinutes.clamp(0, normalizedPlanned.inMinutes);
       final resumeElapsed = Duration(minutes: clampedActualMinutes);
@@ -160,7 +159,8 @@ class _StudySessionScreenState extends State<StudySessionScreen>
         sessionId: sessionId,
       );
     } catch (error, stackTrace) {
-      debugPrint('Failed to link session $sessionId to milestone $milestoneId: $error');
+      debugPrint(
+          'Failed to link session $sessionId to milestone $milestoneId: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
@@ -331,7 +331,8 @@ class _StudySessionScreenState extends State<StudySessionScreen>
     _dismissNotification();
     final endedAt = DateTime.now();
     final actualMinutes = max(_elapsed.inMinutes, 1);
-    final qualifiesForAppLock = result.status == 'completed' || result.ratio >= 0.9;
+    final qualifiesForAppLock =
+        result.status == 'completed' || result.ratio >= 0.9;
     try {
       await _sessionRepository.updateSession(_sessionId!, {
         'endedAt': Timestamp.fromDate(endedAt),
@@ -456,7 +457,9 @@ class _StudySessionScreenState extends State<StudySessionScreen>
                             status: status,
                             ratio: choice == CompletionChoice.partial
                                 ? ratio
-                                : (choice == CompletionChoice.completed ? 1.0 : 0.0),
+                                : (choice == CompletionChoice.completed
+                                    ? 1.0
+                                    : 0.0),
                             markAssignmentComplete: markAssignment,
                           ),
                         );
@@ -475,7 +478,8 @@ class _StudySessionScreenState extends State<StudySessionScreen>
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.studyBlock?.title ?? widget.assignment?.title ?? 'Study Session';
+    final title =
+        widget.studyBlock?.title ?? widget.assignment?.title ?? 'Study Session';
     final subtitle = widget.studyBlock != null
         ? 'Study block · ${_plannedDuration.inMinutes} min'
         : widget.assignment != null
@@ -572,9 +576,11 @@ class _StudySessionScreenState extends State<StudySessionScreen>
   }
 
   String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60).abs().toString().padLeft(2, '0');
+    final minutes =
+        duration.inMinutes.remainder(60).abs().toString().padLeft(2, '0');
     final hours = duration.inHours;
-    final seconds = duration.inSeconds.remainder(60).abs().toString().padLeft(2, '0');
+    final seconds =
+        duration.inSeconds.remainder(60).abs().toString().padLeft(2, '0');
     return '${hours.toString().padLeft(2, '0')}:$minutes:$seconds';
   }
 }

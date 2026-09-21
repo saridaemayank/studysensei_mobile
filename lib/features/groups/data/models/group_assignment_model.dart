@@ -30,23 +30,26 @@ class GroupAssignment extends Equatable {
     Map<String, bool>? userCompletion,
     DateTime? createdAt,
     this.updatedAt,
-  }) : assignedTo = assignedTo ?? [],
-       submissions = submissions ?? [],
-       userCompletion = userCompletion ?? {},
-       createdAt = createdAt ?? DateTime.now();
-       
+  })  : assignedTo = assignedTo ?? [],
+        submissions = submissions ?? [],
+        userCompletion = userCompletion ?? {},
+        createdAt = createdAt ?? DateTime.now();
+
   bool isCompletedByUser(String userId) => userCompletion[userId] ?? false;
-  
+
   GroupAssignment copyWithUserCompletion(String userId, bool isCompleted) {
     // Create an updated user completion map
-    final updatedUserCompletion = Map<String, bool>.from(userCompletion)..[userId] = isCompleted;
-    
+    final updatedUserCompletion = Map<String, bool>.from(userCompletion)
+      ..[userId] = isCompleted;
+
     // Determine the new status
     AssignmentStatus newStatus = status;
     if (assignedTo.isNotEmpty) {
-      final allCompleted = assignedTo.every((uid) => updatedUserCompletion[uid] == true);
-      final someCompleted = assignedTo.any((uid) => updatedUserCompletion[uid] == true);
-      
+      final allCompleted =
+          assignedTo.every((uid) => updatedUserCompletion[uid] == true);
+      final someCompleted =
+          assignedTo.any((uid) => updatedUserCompletion[uid] == true);
+
       if (allCompleted) {
         newStatus = AssignmentStatus.completed;
       } else if (someCompleted) {
@@ -55,7 +58,7 @@ class GroupAssignment extends Equatable {
         newStatus = AssignmentStatus.notStarted;
       }
     }
-    
+
     return GroupAssignment(
       id: id,
       groupId: groupId,
@@ -92,21 +95,22 @@ class GroupAssignment extends Equatable {
   // Helper method to parse status from string with null safety
   static AssignmentStatus _statusFromString(String? status) {
     if (status == null) return AssignmentStatus.notStarted;
-    
+
     // Remove the enum prefix if it exists
     String statusString = status;
     if (status.startsWith('AssignmentStatus.')) {
       statusString = status.replaceAll('AssignmentStatus.', '');
     }
-    
+
     // Try to match the status (case-insensitive)
     for (var value in AssignmentStatus.values) {
-      if (value.toString().toLowerCase() == 'AssignmentStatus.${statusString.toLowerCase()}' ||
+      if (value.toString().toLowerCase() ==
+              'AssignmentStatus.${statusString.toLowerCase()}' ||
           value.name.toLowerCase() == statusString.toLowerCase()) {
         return value;
       }
     }
-    
+
     return AssignmentStatus.notStarted;
   }
 
@@ -118,16 +122,17 @@ class GroupAssignment extends Equatable {
       final title = map['title'] as String? ?? 'Untitled Assignment';
       final description = map['description'] as String? ?? '';
       final createdBy = map['createdBy'] as String? ?? '';
-      
+
       // Debug log the status value from Firestore
       final statusValue = map['status']?.toString() ?? 'notStarted';
       print('Parsing status from Firestore. Raw value: $statusValue');
       final status = _statusFromString(statusValue);
       print('Parsed status: $status (${status.name})');
-      final dueDate = map['dueDate'] != null 
-          ? (map['dueDate'] is Timestamp 
-              ? (map['dueDate'] as Timestamp).toDate() 
-              : DateTime.tryParse(map['dueDate'].toString()) ?? DateTime.now().add(const Duration(days: 7)))
+      final dueDate = map['dueDate'] != null
+          ? (map['dueDate'] is Timestamp
+              ? (map['dueDate'] as Timestamp).toDate()
+              : DateTime.tryParse(map['dueDate'].toString()) ??
+                  DateTime.now().add(const Duration(days: 7)))
           : DateTime.now().add(const Duration(days: 7));
 
       return GroupAssignment(
@@ -138,22 +143,24 @@ class GroupAssignment extends Equatable {
         createdBy: createdBy,
         dueDate: dueDate,
         status: status,
-        assignedTo: map['assignedTo'] != null 
+        assignedTo: map['assignedTo'] != null
             ? List<String>.from(map['assignedTo'] as List)
             : [],
         submissions: (map['submissions'] as List<dynamic>?)
-            ?.map<AssignmentSubmission>((s) => 
-                AssignmentSubmission.fromMap(s as Map<String, dynamic>))
-            .toList() ?? [],
-        userCompletion: map['userCompletion'] != null 
+                ?.map<AssignmentSubmission>((s) =>
+                    AssignmentSubmission.fromMap(s as Map<String, dynamic>))
+                .toList() ??
+            [],
+        userCompletion: map['userCompletion'] != null
             ? Map<String, bool>.from(map['userCompletion'] as Map)
             : {},
-        createdAt: map['createdAt'] != null 
+        createdAt: map['createdAt'] != null
             ? (map['createdAt'] is Timestamp
                 ? (map['createdAt'] as Timestamp).toDate()
-                : DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now())
+                : DateTime.tryParse(map['createdAt'].toString()) ??
+                    DateTime.now())
             : DateTime.now(),
-        updatedAt: map['updatedAt'] != null 
+        updatedAt: map['updatedAt'] != null
             ? (map['updatedAt'] is Timestamp
                 ? (map['updatedAt'] as Timestamp).toDate()
                 : DateTime.tryParse(map['updatedAt'].toString()))

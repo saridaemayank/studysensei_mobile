@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:study_sensei/features/groups/data/models/group_assignment_model.dart';
 import 'package:study_sensei/features/groups/data/enums/assignment_status.dart';
 
@@ -9,15 +10,15 @@ class AddAssignmentDialog extends StatefulWidget {
   final Function(GroupAssignment) onAssignmentAdded;
 
   const AddAssignmentDialog({
-    Key? key,
+    super.key,
     required this.groupId,
     required this.currentUserId,
     required this.memberIds,
     required this.onAssignmentAdded,
-  }) : super(key: key);
+  });
 
   @override
-  _AddAssignmentDialogState createState() => _AddAssignmentDialogState();
+  State<AddAssignmentDialog> createState() => _AddAssignmentDialogState();
 }
 
 class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
@@ -41,7 +42,7 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
     );
-    if (picked != null && picked != _dueDate) {
+    if (mounted && picked != null && picked != _dueDate) {
       setState(() {
         _dueDate = picked;
       });
@@ -65,11 +66,7 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
         status: AssignmentStatus.notStarted,
         assignedTo: widget.memberIds, // Assign to all group members
         submissions: [],
-        userCompletion: Map.fromIterable(
-          widget.memberIds,
-          key: (id) => id,
-          value: (_) => false,
-        ),
+        userCompletion: {for (final id in widget.memberIds) id: false},
       );
 
       widget.onAssignmentAdded(assignment);
@@ -79,7 +76,8 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to create assignment: $e')),
+          const SnackBar(
+              content: Text("Couldn’t add the assignment. Try again.")),
         );
       }
     } finally {
@@ -92,18 +90,21 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add New Assignment'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Add assignment'),
+      scrollable: true,
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Form(
+          key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(
                   labelText: 'Title',
-                  border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -117,24 +118,31 @@ class _AddAssignmentDialogState extends State<AddAssignmentDialog> {
                 controller: _descriptionController,
                 decoration: const InputDecoration(
                   labelText: 'Description',
-                  border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
-              ListTile(
-                title: Text(
-                  _dueDate == null
-                      ? 'No due date'
-                      : 'Due: ${_dueDate!.toString().split(' ')[0]}',
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.borderSubtle),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () => _selectDueDate(context),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                  title: Text(
+                    _dueDate == null
+                        ? 'No due date'
+                        : 'Due: ${_dueDate!.toString().split(' ')[0]}',
+                  ),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () => _selectDueDate(context),
+                ),
               ),
             ],
           ),
         ),
       ),
+      actionsOverflowDirection: VerticalDirection.down,
       actions: [
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),

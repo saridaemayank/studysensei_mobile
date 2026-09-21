@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:meta/meta.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:study_sensei/features/groups/data/models/group_model.dart';
 
 // Events
@@ -70,16 +71,22 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
         ),
       );
 
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        emit(GroupFailure(errorMessage: 'Sign in to see your Dojos.'));
+        return;
+      }
+
       // Get groups where user is a member (from the groups collection)
       final groupsQuery = await _firestore
           .collection('groups')
-          .where('memberIds', arrayContains: event.userId)
+          .where('memberIds', arrayContains: userId)
           .get();
 
       // Also get groups from user's groups subcollection (for backward compatibility)
       final userGroupsSnapshot = await _firestore
           .collection('users')
-          .doc(event.userId)
+          .doc(userId)
           .collection('groups')
           .get();
 
@@ -99,21 +106,27 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
       for (final doc in userGroupsSnapshot.docs) {
         final groupId = doc.data()['groupId'] as String?;
         if (groupId != null && !groupIds.contains(groupId)) {
-          final groupDoc = await _firestore
-              .collection('groups')
-              .doc(groupId)
-              .get();
-          if (groupDoc.exists) {
-            groups.add(Group.fromMap(groupId, groupDoc.data()!));
-            groupIds.add(groupId);
+          try {
+            final groupDoc =
+                await _firestore.collection('groups').doc(groupId).get();
+            if (groupDoc.exists) {
+              groups.add(Group.fromMap(groupId, groupDoc.data()!));
+              groupIds.add(groupId);
+            }
+          } on FirebaseException catch (error) {
+            // A legacy link can survive removal from a private Dojo.
+            // Respect the denial without discarding accessible groups.
+            if (error.code != 'permission-denied') rethrow;
+            debugPrint('Skipped an inaccessible legacy Dojo link.');
           }
         }
       }
 
       emit(GroupLoadSuccess(groups: groups));
     } catch (e) {
-      print('Error loading groups: $e');
-      emit(GroupFailure(errorMessage: 'Failed to load groups: $e'));
+      debugPrint(
+          'Dojos load failed: ${e is FirebaseException ? e.code : 'unexpected'}');
+      emit(GroupFailure(errorMessage: "Couldn't load your Dojos."));
     }
   }
 
@@ -131,9 +144,8 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
       );
 
       // Add the group to Firestore
-      final groupRef = await _firestore
-          .collection('groups')
-          .add(event.group.toMap());
+      final groupRef =
+          await _firestore.collection('groups').add(event.group.toMap());
 
       // Add group reference to user's groups subcollection
       await _firestore
@@ -142,10 +154,10 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
           .collection('groups')
           .doc(groupRef.id)
           .set({
-            'groupId': groupRef.id,
-            'joinedAt': FieldValue.serverTimestamp(),
-            'isAdmin': true,
-          });
+        'groupId': groupRef.id,
+        'joinedAt': FieldValue.serverTimestamp(),
+        'isAdmin': true,
+      });
 
       // Add group reference to each member's groups subcollection
       for (final memberId in event.group.memberIds) {
@@ -156,10 +168,10 @@ class SimpleGroupBloc extends Bloc<GroupEvent, GroupState> {
               .collection('groups')
               .doc(groupRef.id)
               .set({
-                'groupId': groupRef.id,
-                'joinedAt': FieldValue.serverTimestamp(),
-                'isAdmin': event.group.adminIds.contains(memberId),
-              });
+            'groupId': groupRef.id,
+            'joinedAt': FieldValue.serverTimestamp(),
+            'isAdmin': event.group.adminIds.contains(memberId),
+          });
         }
       }
 

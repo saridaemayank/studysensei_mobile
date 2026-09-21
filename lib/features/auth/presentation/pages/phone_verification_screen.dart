@@ -1,3 +1,6 @@
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/core/theme/app_typography.dart';
+import 'package:study_sensei/features/common/widgets/sensei_primary_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +13,8 @@ class PhoneVerificationScreen extends StatefulWidget {
   const PhoneVerificationScreen({super.key});
 
   @override
-  State<PhoneVerificationScreen> createState() => _PhoneVerificationScreenState();
+  State<PhoneVerificationScreen> createState() =>
+      _PhoneVerificationScreenState();
 }
 
 class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
@@ -57,7 +61,8 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
         },
         verificationFailed: (e) {
           setState(() {
-            _statusMessage = e.message ?? 'Failed to send verification code.';
+            _statusMessage =
+                'Couldn’t send the code. Check your number and try again.';
             _isSendingCode = false;
             _isStatusError = true;
           });
@@ -116,9 +121,9 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
         smsCode: smsCode,
       );
       await _linkCredential(credential, _phoneController.text.trim());
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseAuthException {
       setState(() {
-        _statusMessage = e.message ?? 'The code is invalid. Please try again.';
+        _statusMessage = 'The code is invalid or expired. Please try again.';
         _isVerifyingCode = false;
         _isStatusError = true;
       });
@@ -149,7 +154,8 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
     } on FirebaseAuthException catch (e) {
       if (e.code == 'credential-already-in-use') {
         setState(() {
-          _statusMessage = 'This phone number is already linked to another account.';
+          _statusMessage =
+              'This phone number is already linked to another account.';
           _isSendingCode = false;
           _isVerifyingCode = false;
           _isStatusError = true;
@@ -159,7 +165,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
         await user.updatePhoneNumber(credential);
       } else {
         setState(() {
-          _statusMessage = e.message ?? 'Failed to verify phone number.';
+          _statusMessage = 'Couldn’t verify your number. Please try again.';
           _isSendingCode = false;
           _isVerifyingCode = false;
           _isStatusError = true;
@@ -212,7 +218,8 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
       }
     } catch (e) {
       setState(() {
-        _statusMessage = 'Verification succeeded but we could not save the status.';
+        _statusMessage =
+            'Verification succeeded but we could not save the status.';
         _isSendingCode = false;
         _isVerifyingCode = false;
         _isStatusError = true;
@@ -229,20 +236,19 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
       appBar: AppBar(
         title: const Text('Verify Your Phone'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+          child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Add a phone number',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: AppTypography.pageTitle,
             ),
             const SizedBox(height: 8),
             Text(
-              'Enter a phone number with the country code (for example, +1 555 123 4567). We will send you a verification code to unlock AI features.',
+              'Enter a phone number with the country code (for example, +1 555 123 4567). We’ll send a code to verify your number.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 24),
@@ -276,25 +282,18 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
               Text(
                 _statusMessage!,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: _isStatusError
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.primary,
+                  color:
+                      _isStatusError ? AppColors.error : AppColors.primaryLight,
                 ),
               ),
-            const Spacer(),
+            const SizedBox(height: 32),
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ElevatedButton(
-                  onPressed: isBusy ? null : (_codeSent ? _verifyCode : _sendCode),
-                  child: isBusy
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(_codeSent ? 'Verify Code' : 'Send Code'),
-                ),
+                SenseiPrimaryButton(
+                    text: _codeSent ? 'Verify Code' : 'Send Code',
+                    isLoading: isBusy,
+                    onPressed: _codeSent ? _verifyCode : _sendCode),
                 if (_codeSent)
                   TextButton(
                     onPressed: isBusy ? null : _sendCode,
@@ -304,7 +303,7 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

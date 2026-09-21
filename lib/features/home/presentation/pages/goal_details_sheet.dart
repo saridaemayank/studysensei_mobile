@@ -16,7 +16,8 @@ class GoalDetailsSheet extends StatefulWidget {
   });
 
   final LongTermGoal goal;
-  final Future<void> Function(Milestone milestone, bool value) onToggleMilestone;
+  final Future<void> Function(Milestone milestone, bool value)
+      onToggleMilestone;
   final VoidCallback onDeleteGoal;
 
   @override
@@ -57,7 +58,8 @@ class _GoalDetailsSheetState extends State<GoalDetailsSheet> {
     final viewModel = context.watch<HomeViewModel>();
     final milestoneDetails = viewModel.milestoneDetailsForGoal(widget.goal.id);
     _localStatuses.removeWhere(
-      (key, _) => milestoneDetails.every((detail) => detail.milestone.id != key),
+      (key, _) =>
+          milestoneDetails.every((detail) => detail.milestone.id != key),
     );
     return DraggableScrollableSheet(
       expand: false,
@@ -236,7 +238,8 @@ class _MilestoneDetailCard extends StatelessWidget {
     );
   }
 
-  static String _assignmentSubtitle(BuildContext context, HomeAssignment assignment) {
+  static String _assignmentSubtitle(
+      BuildContext context, HomeAssignment assignment) {
     final timeOfDay = TimeOfDay.fromDateTime(assignment.deadline);
     return '${timeOfDay.format(context)} · ${assignment.subject}';
   }
@@ -312,7 +315,8 @@ class _LinkedItemRow extends StatelessWidget {
           ),
           Icon(
             isDone ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: isDone ? theme.colorScheme.primary : theme.colorScheme.outline,
+            color:
+                isDone ? theme.colorScheme.primary : theme.colorScheme.outline,
           ),
         ],
       ),

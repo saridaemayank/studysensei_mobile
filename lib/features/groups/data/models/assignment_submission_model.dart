@@ -42,13 +42,14 @@ class AssignmentSubmission extends Equatable {
   // Helper method to parse status from string with null safety
   static SubmissionStatus _statusFromString(String? status) {
     if (status == null) return SubmissionStatus.submitted;
-    
+
     // Remove the enum prefix if it exists
     final statusString = status.replaceAll('SubmissionStatus.', '');
-    
+
     return SubmissionStatus.values.firstWhere(
-      (e) => e.toString() == 'SubmissionStatus.$statusString' ||
-             e.toString() == statusString,
+      (e) =>
+          e.toString() == 'SubmissionStatus.$statusString' ||
+          e.toString() == statusString,
       orElse: () => SubmissionStatus.submitted,
     );
   }
@@ -57,8 +58,7 @@ class AssignmentSubmission extends Equatable {
   factory AssignmentSubmission.fromMap(Map<String, dynamic> map) {
     try {
       // Ensure required fields exist and have valid values
-      if (map['assignmentId'] == null || 
-          map['userId'] == null) {
+      if (map['assignmentId'] == null || map['userId'] == null) {
         throw FormatException('Missing required fields in submission data');
       }
 
@@ -70,7 +70,8 @@ class AssignmentSubmission extends Equatable {
         attachmentUrls: map['attachmentUrls'] != null
             ? List<String>.from(map['attachmentUrls'] as List)
             : null,
-        submittedAt: (map['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        submittedAt:
+            (map['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         status: _statusFromString(map['status']?.toString()),
         feedback: map['feedback'] as String?,
         grade: (map['grade'] as num?)?.toDouble(),
@@ -110,16 +111,16 @@ class AssignmentSubmission extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    assignmentId,
-    userId,
-    content,
-    attachmentUrls,
-    submittedAt,
-    status,
-    feedback,
-    grade,
-  ];
+        id,
+        assignmentId,
+        userId,
+        content,
+        attachmentUrls,
+        submittedAt,
+        status,
+        feedback,
+        grade,
+      ];
 
   bool get hasAttachments => attachmentUrls?.isNotEmpty ?? false;
   bool get isGraded => status == SubmissionStatus.graded;

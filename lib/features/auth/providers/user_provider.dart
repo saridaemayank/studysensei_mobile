@@ -38,14 +38,12 @@ class UserProvider with ChangeNotifier {
       final userDoc = await _firestore.collection('users').doc(userId).get();
 
       if (userDoc.exists) {
-        debugPrint('Firestore User Data: ${userDoc.data()}');
         _userPreferences = UserPreferences.fromMap(userDoc.data()!, userId);
       } else {
         // Fallback to userPreferences collection for backward compatibility
         final prefsDoc =
             await _firestore.collection('userPreferences').doc(userId).get();
         if (prefsDoc.exists) {
-          debugPrint('Firestore Preferences Data: ${prefsDoc.data()}');
           _userPreferences = UserPreferences.fromMap(prefsDoc.data()!, userId);
         } else {
           // Create default preferences if not exists
@@ -115,38 +113,6 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateSubscriptionPlan(String plan) async {
-    final currentUser = _user;
-    if (currentUser == null) return;
-
-    _userPreferences =
-        (_userPreferences ?? UserPreferences(userId: currentUser.uid))
-            .copyWith(subscriptionPlan: plan);
-
-    try {
-      await Future.wait([
-        _firestore.collection('users').doc(currentUser.uid).set(
-          {
-            'subscriptionPlan': plan,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        ),
-        _firestore.collection('userPreferences').doc(currentUser.uid).set(
-          {
-            'subscriptionPlan': plan,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        ),
-      ]);
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Error updating subscription plan: $e');
-      rethrow;
-    }
-  }
-
   // Save preferences to Firestore
   Future<void> _savePreferences() async {
     if (_userPreferences == null || _user == null) return;
@@ -178,11 +144,13 @@ class UserProvider with ChangeNotifier {
   // Sign in with email and password
   Future<void> signInWithEmailAndPassword(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(
+      final credential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      // The auth state listener will handle the rest
+      // Publish authentication before routing; profile hydration is secondary.
+      _user = credential.user;
+      notifyListeners();
     } on FirebaseAuthException catch (e) {
       debugPrint('Sign in error: ${e.code} - ${e.message}');
       rethrow; // Re-throw to be handled by the caller

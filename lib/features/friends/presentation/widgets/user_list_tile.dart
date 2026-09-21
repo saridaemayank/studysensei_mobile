@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:study_sensei/features/friends/data/models/user_model.dart';
 
 class UserListTile extends StatelessWidget {
@@ -7,17 +8,17 @@ class UserListTile extends StatelessWidget {
   final bool showAddButton;
 
   const UserListTile({
-    Key? key,
+    super.key,
     required this.user,
     required this.onAddFriend,
     this.showAddButton = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.2),
+        backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
         backgroundImage: (user.photoUrl != null && user.photoUrl!.isNotEmpty)
             ? NetworkImage(user.photoUrl!)
             : null,
@@ -37,7 +38,7 @@ class UserListTile extends StatelessWidget {
       ),
       subtitle: Text(
         user.email,
-        style: TextStyle(color: Colors.grey[600]),
+        style: TextStyle(color: AppColors.textSecondary),
         overflow: TextOverflow.ellipsis,
       ),
       trailing: showAddButton

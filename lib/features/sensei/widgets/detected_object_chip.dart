@@ -19,9 +19,8 @@ class DetectedObjectChip extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final chipColor = color ?? colorScheme.primaryContainer;
-    final textColor = color != null 
-        ? Colors.white 
-        : colorScheme.onPrimaryContainer;
+    final textColor =
+        color != null ? Colors.white : colorScheme.onPrimaryContainer;
 
     return Container(
       decoration: BoxDecoration(

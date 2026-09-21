@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../onboarding/presentation/pages/onboarding_screen.dart';
+import '../sensei/screens/sensei_review_screen.dart';
 import 'package:study_sensei/features/auth/login/screens/login_screen.dart';
 import 'package:study_sensei/features/auth/register/screens/register_screen.dart';
 import 'package:study_sensei/features/auth/register/screens/subject_selection_screen.dart';
@@ -17,10 +19,22 @@ class AppRoutes {
   static const String assignments = '/assignments';
   static const String subjectSelection = '/subject-selection';
   static const String sensei = '/sensei';
+  static const String profile = '/profile';
+  static const String focus = '/focus';
+  static const String onboarding = '/onboarding';
+  static const String senseiReview = '/sensei/review';
 
   // Route generator
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case onboarding:
+        return MaterialPageRoute(builder: (_) => const OnboardingScreen());
+      case profile:
+      case focus:
+      case senseiReview:
+        return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => _getPage(settings.name!, settings.arguments));
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case register:
@@ -29,7 +43,7 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const MainLayout());
       case assignments:
         return MaterialPageRoute(
-          builder: (_) => const MainLayout(initialIndex: 1),
+          builder: (_) => const MainLayout(initialIndex: 2),
         );
       case subjectSelection:
         return MaterialPageRoute(
@@ -37,7 +51,7 @@ class AppRoutes {
         );
       case sensei:
         return MaterialPageRoute(
-          builder: (_) => const MainLayout(initialIndex: 2),
+          builder: (_) => const MainLayout(initialIndex: 0),
         );
       case home:
       default:
@@ -98,6 +112,26 @@ class AppRoutes {
   // Helper method to get the page widget based on route name
   static Widget _getPage(String routeName, Object? arguments) {
     switch (routeName) {
+      case onboarding:
+        return const OnboardingScreen();
+      case profile:
+        return const MainLayout(initialIndex: 3);
+      case focus:
+        return const MainLayout(initialIndex: 1);
+      case senseiReview:
+        if (arguments is Map && arguments['videoUrl'] is String) {
+          return SenseiReviewScreen(
+            subject: arguments['subject'] as String? ?? 'General',
+            concept: arguments['concept'] as String? ?? '',
+            isFaceBlurred: arguments['isFaceBlurred'] == true,
+            isMuted: arguments['isMuted'] == true,
+            duration: arguments['duration'] as int? ?? 0,
+            videoUrl: arguments['videoUrl'] as String,
+          );
+        }
+        return const Scaffold(
+            body: SafeArea(
+                child: Center(child: Text("Couldn't open this lesson."))));
       case login:
         return const LoginScreen();
       case register:
@@ -105,11 +139,11 @@ class AppRoutes {
       case main:
         return const MainLayout();
       case assignments:
-        return const MainLayout(initialIndex: 1);
+        return const MainLayout(initialIndex: 2);
       case subjectSelection:
         return const SubjectSelectionScreen();
       case sensei:
-        return const MainLayout(initialIndex: 2);
+        return const MainLayout(initialIndex: 0);
       case home:
       default:
         return const LoginScreen(); // Default to login

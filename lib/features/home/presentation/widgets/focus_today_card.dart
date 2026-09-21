@@ -26,12 +26,16 @@ class FocusTodayCard extends StatelessWidget {
 
     final theme = Theme.of(context);
     final isStudyBlock = task!.type == HomeTaskType.studyBlock;
-    final chipLabel =
-        isStudyBlock ? (task!.studyBlock?.subject?.isNotEmpty ?? false ? task!.studyBlock!.subject! : 'Study Block') : task!.assignment!.subject;
+    final chipLabel = isStudyBlock
+        ? (task!.studyBlock?.subject?.isNotEmpty ?? false
+            ? task!.studyBlock!.subject!
+            : 'Study Block')
+        : task!.assignment!.subject;
     final goalTitle = isStudyBlock
         ? goalTitleResolver(task!.studyBlock!.goalId)
         : goalTitleResolver(task!.assignment!.goalId);
-    final primaryTitle = isStudyBlock ? task!.studyBlock!.title : task!.assignment!.title;
+    final primaryTitle =
+        isStudyBlock ? task!.studyBlock!.title : task!.assignment!.title;
     final subtitle = isStudyBlock
         ? 'Starts ${_dueTimeLabel(context, task!.studyBlock!.scheduledAt)}'
         : 'Due ${_dueTimeLabel(context, task!.assignment!.deadline)}';
@@ -94,9 +98,7 @@ class FocusTodayCard extends StatelessWidget {
                 foregroundColor: theme.colorScheme.primary,
               ),
               child: Text(
-                hasActiveSession(task!)
-                    ? 'Continue Session'
-                    : 'Start Session',
+                hasActiveSession(task!) ? 'Continue Session' : 'Start Session',
               ),
             ),
           ),
@@ -140,7 +142,8 @@ class _EmptyFocusState extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'No assignments from your goals are due soon. Create a new session to stay ahead.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
           TextButton(

@@ -86,7 +86,8 @@ class FriendSearchError extends FriendSearchState {
 class FriendSearchBloc extends Bloc<FriendSearchEvent, FriendSearchState> {
   final FriendRepository friendRepository;
 
-  FriendSearchBloc({required this.friendRepository}) : super(FriendSearchInitial()) {
+  FriendSearchBloc({required this.friendRepository})
+      : super(FriendSearchInitial()) {
     on<SearchUsers>(_onSearchUsers);
     on<LoadFriends>(_onLoadFriends);
     on<RefreshFriends>(_onRefreshFriends);
@@ -97,7 +98,7 @@ class FriendSearchBloc extends Bloc<FriendSearchEvent, FriendSearchState> {
     Emitter<FriendSearchState> emit,
   ) async {
     print('[FriendSearchBloc] Search query: "${event.query}"');
-    
+
     if (event.query.trim().isEmpty) {
       print('[FriendSearchBloc] Empty query, clearing results');
       emit(const FriendSearchLoaded(users: []));
@@ -111,7 +112,7 @@ class FriendSearchBloc extends Bloc<FriendSearchEvent, FriendSearchState> {
       print('[FriendSearchBloc] Calling friendRepository.searchUsers()');
       final users = await friendRepository.searchUsers(event.query);
       print('[FriendSearchBloc] Search completed. Found ${users.length} users');
-      
+
       if (users.isNotEmpty) {
         for (var user in users) {
           print('[FriendSearchBloc] Found user: ${user.name} (${user.email})');
@@ -119,7 +120,7 @@ class FriendSearchBloc extends Bloc<FriendSearchEvent, FriendSearchState> {
       } else {
         print('[FriendSearchBloc] No users found matching the query');
       }
-      
+
       emit(FriendSearchLoaded(users: users, isSearching: true));
     } catch (e, stackTrace) {
       print('[FriendSearchBloc] Error searching users: $e');

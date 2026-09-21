@@ -6,13 +6,14 @@ import 'package:study_sensei/features/groups/presentation/bloc/simple_group_bloc
 import 'package:study_sensei/features/groups/presentation/bloc/assignment/assignment_bloc.dart';
 import 'package:study_sensei/features/groups/presentation/pages/group_details_screen.dart';
 import 'package:study_sensei/features/groups/presentation/widgets/group_card.dart';
-import 'package:study_sensei/features/groups/presentation/widgets/loading_overlay.dart';
+import 'package:study_sensei/features/groups/presentation/widgets/dojo_empty_state.dart';
 import 'package:provider/provider.dart';
 
 class GroupListScreen extends StatefulWidget {
   final String userId;
+  final VoidCallback? onCreate;
 
-  const GroupListScreen({super.key, required this.userId});
+  const GroupListScreen({super.key, required this.userId, this.onCreate});
 
   @override
   State<GroupListScreen> createState() => _GroupListScreenState();
@@ -22,8 +23,6 @@ class _GroupListScreenState extends State<GroupListScreen>
     with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   late SimpleGroupBloc _groupBloc;
-  bool _isLoading = false;
-  String? _errorMessage;
 
   @override
   void initState() {
@@ -52,7 +51,7 @@ class _GroupListScreenState extends State<GroupListScreen>
   }
 
   void _onSearchChanged(String query) {
-    _groupBloc.add(LoadUserGroups(widget.userId));
+    setState(() {});
   }
 
   void _navigateToGroupDetails(BuildContext context, Group group) {
@@ -78,185 +77,81 @@ class _GroupListScreenState extends State<GroupListScreen>
     }
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(8.0),
-      ),
-    );
-  }
-
-  void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(8.0),
-      ),
-    );
-  }
-
-
   @override
-  Widget build(BuildContext context) {
-    return LoadingOverlay(
-      isLoading: _isLoading,
-      loadingMessage: 'Loading dojos...',
-      child: Column(
+  Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Search bar
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: TextField(
+        children: [
+          Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: TextField(
                   controller: _searchController,
-                  enabled: !_isLoading,
                   onChanged: _onSearchChanged,
                   decoration: InputDecoration(
-                    hintText: 'Search dojos...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: _isLoading
-                                ? null
-                                : () {
-                                    _searchController.clear();
-                                    _onSearchChanged('');
-                                  },
-                          )
-                        : null,
-                  ),
-                ),
-              ),
-
-              // Error message
-              if (_errorMessage != null) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12.0),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: Theme.of(context).colorScheme.onErrorContainer,
-                        ),
-                        const SizedBox(width: 12.0),
-                        Expanded(
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onErrorContainer,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => setState(() => _errorMessage = null),
-                          color: Theme.of(context).colorScheme.onErrorContainer,
-                          iconSize: 20.0,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8.0),
-              ],
-
-              // Groups list
-              Expanded(
-                child: BlocBuilder<SimpleGroupBloc, GroupState>(
-                  builder: (context, state) {
-                    if (state is GroupFailure) {
-                      _showErrorSnackBar(state.errorMessage);
-                    } else if (state is GroupOperationSuccess) {
-                      _showSuccessSnackBar(state.message);
-                    }
-
-                    if (state is GroupLoadSuccess || state is GroupLoading) {
-                      final groups = (state as dynamic).groups ?? [];
-                      if (groups.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.group_off,
-                                size: 64.0,
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
-                              const SizedBox(height: 16.0),
-                              Text(
-                                'No groups found',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8.0),
-                              Text(
-                                _searchController.text.isNotEmpty
-                                    ? 'Try a different search term'
-                                    : 'Create a new group to get started',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      return RefreshIndicator(
-                        onRefresh: () async {
-                          _groupBloc.add(LoadUserGroups(widget.userId));
-                          await _groupBloc.stream.firstWhere(
-                            (state) => state is! GroupLoading,
-                          );
-                        },
-                        child: ListView.builder(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          itemCount: groups.length,
-                          itemBuilder: (context, index) {
-                            final group = groups[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
-                              ),
-                              child: GroupCard(
-                                group: group,
-                                onTap: () =>
-                                    _navigateToGroupDetails(context, group),
-                                isLoading: _isLoading,
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    }
-                    return const SizedBox();
-                  },
-                ),
-              ),
-            ],
-      ),
-    );
-  }
+                      hintText: 'Search your Dojos',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                _searchController.clear();
+                                _onSearchChanged('');
+                              })))),
+          Expanded(child: BlocBuilder<SimpleGroupBloc, GroupState>(
+              builder: (context, state) {
+            if (state is GroupFailure) {
+              return Center(
+                  child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Text("Couldn't load your Dojos.",
+                            textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        OutlinedButton(
+                            onPressed: _loadGroups, child: const Text('Retry')),
+                      ])));
+            }
+            final groups = switch (state) {
+              GroupLoadSuccess() => state.groups,
+              GroupLoading() => state.groups,
+              _ => <Group>[],
+            };
+            if (groups.isEmpty &&
+                (state is GroupLoading || state is GroupInitial)) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (groups.isEmpty) {
+              return DojoEmptyState(onCreate: widget.onCreate);
+            }
+            final query = _searchController.text.trim().toLowerCase();
+            final visible = groups
+                .where((group) => group.name.toLowerCase().contains(query))
+                .toList();
+            if (visible.isEmpty) {
+              return const Center(
+                  child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('No matching Dojos. Try another name.',
+                          textAlign: TextAlign.center)));
+            }
+            return RefreshIndicator(
+                onRefresh: () async {
+                  _groupBloc.add(LoadUserGroups(widget.userId));
+                  await _groupBloc.stream
+                      .firstWhere((state) => state is! GroupLoading);
+                },
+                child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 96),
+                    itemCount: visible.length,
+                    itemBuilder: (context, index) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: GroupCard(
+                            group: visible[index],
+                            onTap: () => _navigateToGroupDetails(
+                                context, visible[index])))));
+          })),
+        ],
+      );
 }

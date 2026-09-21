@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/features/common/widgets/sensei_card.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:study_sensei/features/friends/data/models/user_model.dart';
 
 class FriendDetailScreen extends StatelessWidget {
@@ -20,6 +22,7 @@ class FriendDetailScreen extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
+                  tooltip: 'Back',
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
@@ -45,6 +48,7 @@ class FriendDetailScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 friend.name,
+                textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -52,8 +56,9 @@ class FriendDetailScreen extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 friend.email,
+                textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: Colors.grey.shade700),
+                    ?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 24),
               _FriendInfoCard(
@@ -135,9 +140,8 @@ class _FriendInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return SenseiCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
@@ -179,13 +183,14 @@ class _FriendInfoRow extends StatelessWidget {
         children: [
           Icon(icon, color: theme.primaryColor),
           const SizedBox(width: 12),
-          Column(
+          Expanded(
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
                 style: theme.textTheme.bodySmall
-                    ?.copyWith(color: Colors.grey.shade600),
+                    ?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 4),
               Text(
@@ -194,7 +199,7 @@ class _FriendInfoRow extends StatelessWidget {
                     ?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
-          ),
+          )),
         ],
       ),
     );

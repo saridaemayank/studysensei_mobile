@@ -87,7 +87,8 @@ class _SummaryCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),

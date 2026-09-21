@@ -117,26 +117,28 @@ class HomeViewModel extends ChangeNotifier {
     );
     _milestonesSub = repository.watchMilestones(userId).listen(
       (milestones) {
-        _updateState(milestones: milestones, isLoading: false, errorMessage: null);
+        _updateState(
+            milestones: milestones, isLoading: false, errorMessage: null);
       },
       onError: (error) => _updateState(errorMessage: error.toString()),
     );
     _assignmentsSub = repository.watchAssignments(userId).listen(
       (assignments) {
-        _updateState(assignments: assignments, isLoading: false, errorMessage: null);
+        _updateState(
+            assignments: assignments, isLoading: false, errorMessage: null);
       },
       onError: (error) => _updateState(errorMessage: error.toString()),
     );
     _studyBlocksSub = repository.watchStudyBlocks(userId).listen(
-      (blocks) =>
-          _updateState(studyBlocks: blocks, isLoading: false, errorMessage: null),
-      onError: (error) => _updateState(errorMessage: error.toString()),
-    );
+          (blocks) => _updateState(
+              studyBlocks: blocks, isLoading: false, errorMessage: null),
+          onError: (error) => _updateState(errorMessage: error.toString()),
+        );
     _studySessionsSub = repository.watchStudySessions(userId).listen(
-      (sessions) =>
-          _updateState(studySessions: sessions, isLoading: false, errorMessage: null),
-      onError: (error) => _updateState(errorMessage: error.toString()),
-    );
+          (sessions) => _updateState(
+              studySessions: sessions, isLoading: false, errorMessage: null),
+          onError: (error) => _updateState(errorMessage: error.toString()),
+        );
   }
 
   void _updateState({
@@ -180,16 +182,18 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   List<StudyBlock> studyBlocksForDay(DateTime day) {
-    return _state.studyBlocks.where((block) => _isSameDay(block.scheduledAt, day)).toList()
+    return _state.studyBlocks
+        .where((block) => _isSameDay(block.scheduledAt, day))
+        .toList()
       ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
   }
 
-  int assignmentsCountForDay(DateTime day) =>
-      assignmentsForDay(day).length;
+  int assignmentsCountForDay(DateTime day) => assignmentsForDay(day).length;
 
   int milestonesDueCountForDay(DateTime day) {
     return _state.milestones
-        .where((milestone) => milestone.dueDate != null && _isSameDay(milestone.dueDate!, day))
+        .where((milestone) =>
+            milestone.dueDate != null && _isSameDay(milestone.dueDate!, day))
         .length;
   }
 
@@ -259,7 +263,9 @@ class HomeViewModel extends ChangeNotifier {
     if (goalLinked.isNotEmpty) {
       return HomeTask.assignment(goalLinked.first);
     }
-    return sortedAssignments.isNotEmpty ? HomeTask.assignment(sortedAssignments.first) : null;
+    return sortedAssignments.isNotEmpty
+        ? HomeTask.assignment(sortedAssignments.first)
+        : null;
   }
 
   double goalProgress(String goalId) {
@@ -282,7 +288,9 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   List<Milestone> milestonesForGoal(String goalId) {
-    return _state.milestones.where((milestone) => milestone.goalId == goalId).toList()
+    return _state.milestones
+        .where((milestone) => milestone.goalId == goalId)
+        .toList()
       ..sort((a, b) {
         final aDate = a.dueDate ?? DateTime(2100);
         final bDate = b.dueDate ?? DateTime(2100);
@@ -337,19 +345,23 @@ class HomeViewModel extends ChangeNotifier {
     final weekEnd = _state.weekStart.add(const Duration(days: 7));
 
     final weeklyAssignments = _state.assignments.where((assignment) {
-      return assignment.deadline.isAfter(_state.weekStart.subtract(const Duration(days: 1))) &&
+      return assignment.deadline
+              .isAfter(_state.weekStart.subtract(const Duration(days: 1))) &&
           assignment.deadline.isBefore(weekEnd);
     });
 
-    final totalMinutes = weeklyAssignments.where((a) => a.isCompleted).fold<int>(
-      0,
-      (accumulator, assignment) => accumulator + (assignment.estimatedMinutes ?? 0),
-    );
+    final totalMinutes =
+        weeklyAssignments.where((a) => a.isCompleted).fold<int>(
+              0,
+              (accumulator, assignment) =>
+                  accumulator + (assignment.estimatedMinutes ?? 0),
+            );
 
     final weeklyMilestones = _state.milestones.where((milestone) {
       final dueDate = milestone.dueDate;
       if (dueDate == null) return false;
-      return dueDate.isAfter(_state.weekStart.subtract(const Duration(days: 1))) &&
+      return dueDate
+              .isAfter(_state.weekStart.subtract(const Duration(days: 1))) &&
           dueDate.isBefore(weekEnd);
     }).toList();
 
@@ -368,14 +380,18 @@ class HomeViewModel extends ChangeNotifier {
     final normalizedToday = DateTime.now();
     var streak = 0;
     for (var offset = 0; offset < 30; offset++) {
-      final day =
-          DateTime(normalizedToday.year, normalizedToday.month, normalizedToday.day)
-              .subtract(Duration(days: offset));
+      final day = DateTime(
+              normalizedToday.year, normalizedToday.month, normalizedToday.day)
+          .subtract(Duration(days: offset));
       final hasCompletedAssignment = _state.assignments.any(
-        (assignment) => assignment.isCompleted && _isSameDay(assignment.deadline, day),
+        (assignment) =>
+            assignment.isCompleted && _isSameDay(assignment.deadline, day),
       );
       final hasCompletedMilestone = _state.milestones.any(
-        (milestone) => milestone.isCompleted && milestone.dueDate != null && _isSameDay(milestone.dueDate!, day),
+        (milestone) =>
+            milestone.isCompleted &&
+            milestone.dueDate != null &&
+            _isSameDay(milestone.dueDate!, day),
       );
       if (hasCompletedAssignment || hasCompletedMilestone) {
         streak += 1;
@@ -386,7 +402,8 @@ class HomeViewModel extends ChangeNotifier {
     return streak;
   }
 
-  Future<void> toggleAssignmentCompletion(String assignmentId, bool isCompleted) {
+  Future<void> toggleAssignmentCompletion(
+      String assignmentId, bool isCompleted) {
     return repository.toggleAssignmentCompletion(
       userId: userId,
       assignmentId: assignmentId,
@@ -394,7 +411,8 @@ class HomeViewModel extends ChangeNotifier {
     );
   }
 
-  Future<void> toggleMilestoneCompletion(String goalId, String milestoneId, bool isCompleted) async {
+  Future<void> toggleMilestoneCompletion(
+      String goalId, String milestoneId, bool isCompleted) async {
     final previousState = _state.milestones;
     final updatedMilestones = previousState
         .map(
@@ -563,7 +581,8 @@ bool _isSameDay(DateTime a, DateTime b) {
 DateTime _startOfWeek(DateTime date) {
   final weekday = date.weekday;
   final difference = weekday - DateTime.monday;
-  return DateTime(date.year, date.month, date.day).subtract(Duration(days: difference));
+  return DateTime(date.year, date.month, date.day)
+      .subtract(Duration(days: difference));
 }
 
 enum HomeTaskType { assignment, studyBlock }

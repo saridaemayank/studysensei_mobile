@@ -14,7 +14,10 @@ class HomeRepository {
   static const String _milestoneCollectionName = 'milestones';
 
   CollectionReference<Map<String, dynamic>> _userGoals(String userId) {
-    return _firestore.collection('users').doc(userId).collection('longTermGoals');
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('longTermGoals');
   }
 
   DocumentReference<Map<String, dynamic>> _milestoneDoc(
@@ -60,7 +63,6 @@ class HomeRepository {
 
   Stream<List<StudyBlock>> watchStudyBlocks(String userId) {
     return _userStudyBlocks(userId)
-        .orderBy('scheduledAt')
         .snapshots()
         .map((snapshot) => snapshot.docs.map(StudyBlock.fromDoc).toList());
   }
@@ -76,7 +78,10 @@ class HomeRepository {
   }
 
   CollectionReference<Map<String, dynamic>> _userStudySessions(String userId) {
-    return _firestore.collection('users').doc(userId).collection('studySessions');
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('studySessions');
   }
 
   Future<void> toggleAssignmentCompletion({
@@ -94,7 +99,8 @@ class HomeRepository {
     }
   }
 
-  Future<void> _completeSessionsForAssignment(String userId, String assignmentId) async {
+  Future<void> _completeSessionsForAssignment(
+      String userId, String assignmentId) async {
     final sessions = await _userStudySessions(userId)
         .where('assignmentId', isEqualTo: assignmentId)
         .get();
@@ -110,7 +116,8 @@ class HomeRepository {
       batch.update(doc.reference, {
         'completionStatus': 'completed',
         'completionRatio': 1.0,
-        'actualDurationMinutes': actualMinutes > 0 ? actualMinutes : plannedMinutes,
+        'actualDurationMinutes':
+            actualMinutes > 0 ? actualMinutes : plannedMinutes,
         'endedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -181,8 +188,10 @@ class HomeRepository {
     DateTime? dueDate,
     Map<String, dynamic>? metadata,
   }) async {
-    final milestoneRef =
-        _userGoals(userId).doc(goalId).collection(_milestoneCollectionName).doc();
+    final milestoneRef = _userGoals(userId)
+        .doc(goalId)
+        .collection(_milestoneCollectionName)
+        .doc();
     final milestone = Milestone(
       id: milestoneRef.id,
       goalId: goalId,

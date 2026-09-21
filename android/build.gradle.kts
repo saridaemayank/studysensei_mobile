@@ -1,4 +1,4 @@
-// Root-level build.gradle (Kotlin DSL) — aligned with Settings plugins (AGP 8.5.0, Kotlin 1.9.24)
+// Root-level build.gradle (Kotlin DSL) — aligned with Settings plugins.
 // No buildscript/classpath block needed because plugins and versions are declared via settings.gradle
 // and applied in module build files.
 

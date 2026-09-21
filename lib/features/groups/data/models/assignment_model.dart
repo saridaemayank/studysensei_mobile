@@ -45,7 +45,9 @@ class Assignment {
       createdAt: DateTime.parse(json['createdAt']),
       isCompleted: json['isCompleted'] ?? false,
       completedBy: json['completedBy'],
-      completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
+      completedAt: json['completedAt'] != null
+          ? DateTime.parse(json['completedAt'])
+          : null,
     );
   }
 

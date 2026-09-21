@@ -7,6 +7,12 @@ class StudyBlock {
   final String? subject;
   final DateTime scheduledAt;
   final int durationMinutes;
+  final String? dojoId;
+  final String? chapterId;
+  final String? blockType;
+  final String? notes;
+  final String? roadmapRef;
+  final String? status;
   final String? goalId;
   final String? assignmentId;
   final String? milestoneId;
@@ -24,6 +30,12 @@ class StudyBlock {
     required this.createdAt,
     required this.updatedAt,
     this.subject,
+    this.dojoId,
+    this.chapterId,
+    this.blockType,
+    this.notes,
+    this.roadmapRef,
+    this.status,
     this.goalId,
     this.assignmentId,
     this.milestoneId,
@@ -33,18 +45,56 @@ class StudyBlock {
 
   factory StudyBlock.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? <String, dynamic>{};
+    DateTime resolveDate() {
+      final scheduledTs = (data['scheduledAt'] as Timestamp?)?.toDate();
+      if (scheduledTs != null) return scheduledTs;
+      final sessionTs = (data['sessionDate'] as Timestamp?)?.toDate();
+      if (sessionTs != null) return sessionTs;
+      final dateString = data['date'] as String?;
+      if (dateString != null) {
+        final segments = dateString.split('-').map(int.tryParse).toList();
+        if (segments.length == 3 &&
+            segments[0] != null &&
+            segments[1] != null &&
+            segments[2] != null) {
+          return DateTime(
+            segments[0]!,
+            segments[1]!,
+            segments[2]!,
+          );
+        }
+      }
+      return DateTime.now();
+    }
+
+    final blockType = data['blockType'] as String? ?? data['type'] as String?;
+    final title = data['title'] as String? ??
+        data['chapter'] as String? ??
+        data['chapterName'] as String? ??
+        (blockType != null ? '$blockType block' : 'Study block');
+    final subjectName =
+        data['subject'] as String? ?? data['subjectName'] as String?;
+    final status = data['status'] as String?;
     return StudyBlock(
       id: doc.id,
       userId: data['userId'] as String? ?? '',
-      title: data['title'] as String? ?? '',
-      subject: data['subject'] as String?,
-      scheduledAt: (data['scheduledAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      durationMinutes: data['durationMinutes'] is int ? data['durationMinutes'] as int : 25,
+      title: title,
+      subject: subjectName,
+      dojoId: data['dojoId'] as String?,
+      chapterId: data['chapterId'] as String?,
+      blockType: blockType,
+      notes: data['notes'] as String?,
+      roadmapRef: data['roadmapRef'] as String?,
+      status: status,
+      scheduledAt: resolveDate(),
+      durationMinutes:
+          data['durationMinutes'] is int ? data['durationMinutes'] as int : 25,
       goalId: data['goalId'] as String?,
       assignmentId: data['assignmentId'] as String?,
       milestoneId: data['milestoneId'] as String?,
       reminderEnabled: data['reminderEnabled'] as bool? ?? false,
-      isCompleted: data['isCompleted'] as bool? ?? false,
+      isCompleted: data['isCompleted'] as bool? ??
+          (status != null && status.toLowerCase() == 'completed'),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -57,6 +107,12 @@ class StudyBlock {
       'subject': subject,
       'scheduledAt': Timestamp.fromDate(scheduledAt),
       'durationMinutes': durationMinutes,
+      'dojoId': dojoId,
+      'chapterId': chapterId,
+      'blockType': blockType,
+      'notes': notes,
+      'roadmapRef': roadmapRef,
+      'status': status,
       'goalId': goalId,
       'assignmentId': assignmentId,
       'milestoneId': milestoneId,
@@ -74,6 +130,12 @@ class StudyBlock {
     String? subject,
     DateTime? scheduledAt,
     int? durationMinutes,
+    String? dojoId,
+    String? chapterId,
+    String? blockType,
+    String? notes,
+    String? roadmapRef,
+    String? status,
     String? goalId,
     String? assignmentId,
     String? milestoneId,
@@ -89,6 +151,12 @@ class StudyBlock {
       subject: subject ?? this.subject,
       scheduledAt: scheduledAt ?? this.scheduledAt,
       durationMinutes: durationMinutes ?? this.durationMinutes,
+      dojoId: dojoId ?? this.dojoId,
+      chapterId: chapterId ?? this.chapterId,
+      blockType: blockType ?? this.blockType,
+      notes: notes ?? this.notes,
+      roadmapRef: roadmapRef ?? this.roadmapRef,
+      status: status ?? this.status,
       goalId: goalId ?? this.goalId,
       assignmentId: assignmentId ?? this.assignmentId,
       milestoneId: milestoneId ?? this.milestoneId,

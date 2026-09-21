@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
 class AssignmentsListPage extends StatefulWidget {
-  const AssignmentsListPage({Key? key}) : super(key: key);
+  const AssignmentsListPage({super.key});
 
   @override
-  _AssignmentsListPageState createState() => _AssignmentsListPageState();
+  State<AssignmentsListPage> createState() => _AssignmentsListPageState();
 }
 
 class _AssignmentsListPageState extends State<AssignmentsListPage> {
@@ -15,16 +16,9 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Map<String, Color> _subjectColors = {};
   final List<Color> _availableColors = [
-    Colors.red,
-    Colors.green,
-    Colors.blue,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-    Colors.amber,
-    Colors.cyan,
-    Colors.indigo,
+    AppColors.primary,
+    AppColors.info,
+    AppColors.primaryLight,
   ];
 
   Color _getSubjectColor(String subject) {
@@ -56,9 +50,9 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
           .collection('assignments')
           .doc(docId)
           .update({
-            'isCompleted': newStatus,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+        'isCompleted': newStatus,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       // Find and update the corresponding calendar event
       final calendarEvents = await _firestore
@@ -106,8 +100,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
           .snapshots()
           .handleError(
         (error) {
-          if (error is FirebaseException &&
-              error.code == 'permission-denied') {
+          if (error is FirebaseException && error.code == 'permission-denied') {
             return;
           }
           debugPrint('Assignment stream error: $error');
@@ -120,12 +113,12 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
         title: const Text(
           'My Assignments',
           style: TextStyle(
-            fontFamily: 'DancingScript',
-            fontSize: 28,
+            fontFamily: 'Headings',
+            fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.orange[100],
+        backgroundColor: AppColors.background,
         elevation: 0,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -133,7 +126,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
-              child: Text('Error loading assignments: ${snapshot.error}'),
+              child: const Text("Couldn't load your assignments right now."),
             );
           }
 
@@ -141,8 +134,8 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final assignments =
-              snapshot.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+          final assignments = snapshot.data?.docs ??
+              <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
           if (assignments.isEmpty) {
             return const Center(
@@ -151,7 +144,8 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
                 child: Text(
                   'No upcoming assignments!\n\nAll caught up for now.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                  style:
+                      TextStyle(fontSize: 18, color: AppColors.textSecondary),
                 ),
               ),
             );
@@ -177,7 +171,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: _getSubjectColor(subject).withOpacity(0.2),
+                      color: _getSubjectColor(subject).withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -196,10 +190,9 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      decoration: isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: isCompleted ? Colors.grey : null,
+                      decoration:
+                          isCompleted ? TextDecoration.lineThrough : null,
+                      color: isCompleted ? AppColors.textSecondary : null,
                     ),
                   ),
                   subtitle: Column(
@@ -209,7 +202,7 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
                         Text(
                           description,
                           style: TextStyle(
-                            color: isCompleted ? Colors.grey[600] : null,
+                            color: isCompleted ? AppColors.textSecondary : null,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -220,18 +213,21 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
                           Icon(
                             Icons.calendar_today,
                             size: 14,
-                            color: isCompleted ? Colors.grey : Colors.grey[600],
+                            color: isCompleted
+                                ? AppColors.textSecondary
+                                : AppColors.textSecondary,
                           ),
                           const SizedBox(width: 4),
-                          Text(
+                          Expanded(
+                              child: Text(
                             _formatDate(deadline),
                             style: TextStyle(
                               color: isCompleted
-                                  ? Colors.grey
-                                  : Colors.grey[600],
+                                  ? AppColors.textSecondary
+                                  : AppColors.textSecondary,
                               fontSize: 12,
                             ),
-                          ),
+                          )),
                         ],
                       ),
                     ],
@@ -243,11 +239,8 @@ class _AssignmentsListPageState extends State<AssignmentsListPage> {
                         _toggleAssignmentCompletion(doc.id, isCompleted);
                       }
                     },
-                    activeColor: Colors.orange,
+                    activeColor: AppColors.primary,
                   ),
-                  onTap: () {
-                    // TODO: Navigate to assignment details
-                  },
                 ),
               );
             },

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/core/theme/app_typography.dart';
 import 'package:study_sensei/features/groups/data/models/group_model.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/group/group_bloc.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/group/group_event.dart';
@@ -20,15 +22,15 @@ class GroupMemberList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<GroupBloc, GroupState>(
-      listenWhen: (previous, current) => 
+      listenWhen: (previous, current) =>
           current is GroupFailure || current is GroupOperationSuccess,
       listener: (context, state) {
         if (state is GroupFailure) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.errorMessage),
-              backgroundColor: Theme.of(context).colorScheme.error,
+              content: const Text("Couldn't update members right now."),
+              backgroundColor: AppColors.error,
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(8.0),
               duration: const Duration(seconds: 3),
@@ -39,7 +41,7 @@ class GroupMemberList extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
-              backgroundColor: Theme.of(context).colorScheme.primary,
+              backgroundColor: AppColors.primary,
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(8.0),
               duration: const Duration(seconds: 2),
@@ -57,37 +59,56 @@ class GroupMemberList extends StatelessWidget {
             ),
           );
         }
-        
+
         return Column(
           children: [
             // Pending invites section
-            if (isAdmin && group.pendingInvites.isNotEmpty) ..._buildPendingInvites(context),
-            
+            if (isAdmin && group.pendingInvites.isNotEmpty)
+              ..._buildPendingInvites(context),
+
             // Members list
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(16.0),
                 itemCount: group.memberIds.length,
                 itemBuilder: (context, index) {
-                final memberId = group.memberIds[index];
-                final isCurrentUser = memberId == currentUserId;
-                final isMemberAdmin = group.adminIds.contains(memberId);
-                
-                // TODO: Replace with actual user data from repository
-                final username = 'User ${memberId.substring(0, 4)}';
-                final email = 'user${memberId.substring(0, 4)}@example.com';
-                
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8.0),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  final memberId = group.memberIds[index];
+                  final isCurrentUser = memberId == currentUserId;
+                  final isMemberAdmin = group.adminIds.contains(memberId);
+
+                  // TODO: Replace with actual user data from repository
+                  final username = 'User ${memberId.substring(0, 4)}';
+                  final email = 'user${memberId.substring(0, 4)}@example.com';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      border: Border.all(color: AppColors.borderSubtle),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
                     child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                        child: Text(username[0].toUpperCase()),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
                       ),
-                      title: Text(username),
-                      subtitle: Text(email),
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.14),
+                        child: Text(
+                          username[0].toUpperCase(),
+                          style: const TextStyle(
+                            color: AppColors.primaryLight,
+                          ),
+                        ),
+                      ),
+                      title: Text(username, style: AppTypography.cardTitle),
+                      subtitle: Text(
+                        email,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -98,13 +119,17 @@ class GroupMemberList extends StatelessWidget {
                                 vertical: 2.0,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
                               child: Text(
                                 'Admin',
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.primary,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: AppColors.primaryLight,
                                       fontWeight: FontWeight.bold,
                                     ),
                               ),
@@ -136,12 +161,11 @@ class GroupMemberList extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-          
+
             // Add member button for admins
             if (isAdmin)
               Padding(
@@ -167,44 +191,50 @@ class GroupMemberList extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(24.0, 16.0, 24.0, 8.0),
         child: Text(
           'Pending Invites',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
+          style:
+              AppTypography.cardTitle.copyWith(color: AppColors.primaryLight),
         ),
       ),
-      ...group.pendingInvites.map((email) => Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-            child: const Icon(Icons.mail_outline, size: 20),
+      ...group.pendingInvites.map(
+        (email) => Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceElevated,
+            border: Border.all(color: AppColors.borderSubtle),
+            borderRadius: BorderRadius.circular(18),
           ),
-          title: Text(email),
-          subtitle: const Text('Invitation pending'),
-          trailing: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => _cancelInvite(context, email),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppColors.surfaceHighlight,
+              child: const Icon(Icons.mail_outline, size: 20),
+            ),
+            title: Text(email),
+            subtitle: const Text('Invitation pending'),
+            trailing: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => _cancelInvite(context, email),
+            ),
           ),
         ),
-      )).toList(),
-      const Divider(),
+      ),
+      const SizedBox(height: 8),
     ];
   }
 
-  void _handleMemberAction(BuildContext context, String action, String memberId) {
+  void _handleMemberAction(
+      BuildContext context, String action, String memberId) {
     switch (action) {
       case 'make_admin':
         context.read<GroupBloc>().add(AddGroupAdmin(
-          groupId: group.id,
-          userId: memberId,
-        ));
+              groupId: group.id,
+              userId: memberId,
+            ));
         break;
       case 'remove_admin':
         context.read<GroupBloc>().add(RemoveGroupAdmin(
-          groupId: group.id,
-          userId: memberId,
-        ));
+              groupId: group.id,
+              userId: memberId,
+            ));
         break;
       case 'remove':
         _confirmRemoveMember(context, memberId);
@@ -217,7 +247,8 @@ class GroupMemberList extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Remove Member'),
-        content: const Text('Are you sure you want to remove this member from the group?'),
+        content: const Text(
+            'Are you sure you want to remove this member from the group?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -226,13 +257,13 @@ class GroupMemberList extends StatelessWidget {
           TextButton(
             onPressed: () {
               context.read<GroupBloc>().add(RemoveGroupMember(
-                groupId: group.id,
-                userId: memberId,
-              ));
+                    groupId: group.id,
+                    userId: memberId,
+                  ));
               Navigator.pop(context);
             },
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+              foregroundColor: AppColors.error,
             ),
             child: const Text('Remove'),
           ),
@@ -244,11 +275,12 @@ class GroupMemberList extends StatelessWidget {
   void _showAddMemberDialog(BuildContext context) {
     final emailController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Add Member'),
+        scrollable: true,
         content: Form(
           key: formKey,
           child: TextFormField(
@@ -294,14 +326,14 @@ class GroupMemberList extends StatelessWidget {
       ),
     );
   }
-  
+
   void _cancelInvite(BuildContext context, String email) {
     // Dispatch CancelInvite event to the BLoC
     context.read<GroupBloc>().add(CancelInvite(
           groupId: group.id,
           email: email,
         ));
-    
+
     // Show loading message
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Cancelling invitation...')),

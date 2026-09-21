@@ -26,8 +26,9 @@ class GroupRemoteDataSource {
           .handleError((error) {
         throw ServerException('Failed to fetch user groups: $error');
       }).map((snapshot) => snapshot.docs
-          .map((doc) => Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList());
+              .map((doc) =>
+                  Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+              .toList());
     } catch (e) {
       throw ServerException('Failed to fetch user groups: $e');
     }
@@ -165,9 +166,9 @@ class GroupRemoteDataSource {
           .handleError((error) {
         throw ServerException('Failed to fetch group assignments: $error');
       }).map((snapshot) => snapshot.docs
-          .map((doc) => GroupAssignment.fromMap(
-              doc.id, doc.data() as Map<String, dynamic>))
-          .toList());
+              .map((doc) => GroupAssignment.fromMap(
+                  doc.id, doc.data() as Map<String, dynamic>))
+              .toList());
     } catch (e) {
       throw ServerException('Failed to fetch group assignments: $e');
     }
@@ -233,7 +234,9 @@ class GroupRemoteDataSource {
 
         final data = doc.data() as Map<String, dynamic>;
         final submissions = List<Map<String, dynamic>>.from(
-          (data['submissions'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
+          (data['submissions'] as List<dynamic>?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [],
         );
 
         // Remove existing submission if it exists
@@ -281,10 +284,11 @@ class GroupRemoteDataSource {
             .limit(50)
             .snapshots()
             .map((snapshot) => snapshot.docs
-                .map((doc) => Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+                .map((doc) =>
+                    Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
                 .toList());
       }
-      
+
       final searchTerm = query.toLowerCase();
       return _groupsCollection
           .where('isPublic', isEqualTo: true)
@@ -292,10 +296,10 @@ class GroupRemoteDataSource {
           .limit(50)
           .snapshots()
           .handleError((error) {
-            throw ServerException('Failed to search groups: $error');
-          })
-          .map((snapshot) => snapshot.docs
-              .map((doc) => Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+        throw ServerException('Failed to search groups: $error');
+      }).map((snapshot) => snapshot.docs
+              .map((doc) =>
+                  Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
               .toList());
     } on FirebaseException catch (e) {
       throw ServerException('Failed to search groups: ${e.message}');
@@ -310,9 +314,10 @@ class GroupRemoteDataSource {
           .where('isPublic', isEqualTo: true)
           .limit(50)
           .get();
-      
+
       return snapshot.docs
-          .map((doc) => Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+          .map((doc) =>
+              Group.fromMap(doc.id, doc.data() as Map<String, dynamic>))
           .toList();
     } on FirebaseException catch (e) {
       throw ServerException('Failed to get public groups: ${e.message}');

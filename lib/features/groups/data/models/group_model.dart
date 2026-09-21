@@ -39,15 +39,15 @@ class Group extends Equatable {
   // Generate search terms from name and description
   static List<String> _generateSearchTerms(String name, String description) {
     final terms = <String>{};
-    
+
     // Add full name and description in lowercase
     terms.add(name.toLowerCase());
     terms.add(description.toLowerCase());
-    
+
     // Split into words and add each word
     terms.addAll(name.toLowerCase().split(' '));
     terms.addAll(description.toLowerCase().split(' '));
-    
+
     // Remove empty strings and duplicates
     return terms.where((term) => term.isNotEmpty).toList();
   }

@@ -50,7 +50,8 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
     final initial = widget.initialBlock;
     _titleController = TextEditingController(text: initial?.title ?? '');
     _subjectController = TextEditingController(text: initial?.subject ?? '');
-    _scheduledAt = initial?.scheduledAt ?? DateTime.now().add(const Duration(hours: 1));
+    _scheduledAt =
+        initial?.scheduledAt ?? DateTime.now().add(const Duration(hours: 1));
     _durationMinutes = initial?.durationMinutes ?? 25;
     _durationController =
         TextEditingController(text: _durationMinutes.toString());
@@ -121,7 +122,9 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
         title: _titleController.text.trim(),
         scheduledAt: _scheduledAt,
         durationMinutes: _durationMinutes,
-        subject: _subjectController.text.trim().isEmpty ? null : _subjectController.text.trim(),
+        subject: _subjectController.text.trim().isEmpty
+            ? null
+            : _subjectController.text.trim(),
         goalId: _selectedGoalId,
         assignmentId: _selectedAssignmentId,
         reminderEnabled: _reminderEnabled,
@@ -153,7 +156,9 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      widget.initialBlock == null ? 'New Study Block' : 'Edit Study Block',
+                      widget.initialBlock == null
+                          ? 'New Study Block'
+                          : 'Edit Study Block',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     IconButton(
@@ -166,13 +171,15 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
                 TextFormField(
                   controller: _titleController,
                   decoration: const InputDecoration(labelText: 'Title *'),
-                  validator: (value) =>
-                      (value == null || value.trim().isEmpty) ? 'Title is required' : null,
+                  validator: (value) => (value == null || value.trim().isEmpty)
+                      ? 'Title is required'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _subjectController,
-                  decoration: const InputDecoration(labelText: 'Subject (optional)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Subject (optional)'),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -225,7 +232,8 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
                       child: OutlinedButton.icon(
                         onPressed: _pickTime,
                         icon: const Icon(Icons.schedule),
-                        label: Text(TimeOfDay.fromDateTime(_scheduledAt).format(context)),
+                        label: Text(TimeOfDay.fromDateTime(_scheduledAt)
+                            .format(context)),
                       ),
                     ),
                   ],
@@ -249,7 +257,8 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String?>(
                   value: _selectedAssignmentId,
-                  decoration: const InputDecoration(labelText: 'Link to assignment'),
+                  decoration:
+                      const InputDecoration(labelText: 'Link to assignment'),
                   items: [
                     const DropdownMenuItem<String?>(
                         value: null, child: Text('None')),
@@ -260,12 +269,14 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
                       ),
                     ),
                   ],
-                  onChanged: (value) => setState(() => _selectedAssignmentId = value),
+                  onChanged: (value) =>
+                      setState(() => _selectedAssignmentId = value),
                 ),
                 const SizedBox(height: 16),
                 SwitchListTile(
                   value: _reminderEnabled,
-                  onChanged: (value) => setState(() => _reminderEnabled = value),
+                  onChanged: (value) =>
+                      setState(() => _reminderEnabled = value),
                   title: const Text('Remind me before this block'),
                 ),
                 const SizedBox(height: 16),
@@ -279,7 +290,9 @@ class _StudyBlockSheetState extends State<StudyBlockSheet> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(widget.initialBlock == null ? 'Create Block' : 'Save Changes'),
+                        : Text(widget.initialBlock == null
+                            ? 'Create Block'
+                            : 'Save Changes'),
                   ),
                 ),
               ],

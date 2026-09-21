@@ -20,7 +20,8 @@ class SenseiCaptureScreen extends StatefulWidget {
   State<SenseiCaptureScreen> createState() => _SenseiCaptureScreenState();
 }
 
-class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsBindingObserver {
+class _SenseiCaptureScreenState extends State<SenseiCaptureScreen>
+    with WidgetsBindingObserver {
   bool _isRecording = false;
   bool _isFaceBlurred = false;
   bool _isMuted = false;
@@ -64,28 +65,28 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
   Future<void> _initializeCamera() async {
     try {
       WidgetsFlutterBinding.ensureInitialized();
-      
+
       // Request camera permissions
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         throw Exception('No cameras found');
       }
-      
+
       // Use the first camera (back camera by default)
       final camera = cameras.firstWhere(
         (camera) => camera.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
-      
+
       _cameraController = CameraController(
         camera,
         ResolutionPreset.medium,
         enableAudio: true,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
-      
+
       await _cameraController?.initialize();
-      
+
       if (mounted) {
         setState(() {
           _isCameraInitialized = true;
@@ -113,7 +114,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
 
     try {
       _cameraController!.startVideoRecording();
-      
+
       setState(() {
         _isRecording = true;
         _recordingDuration = 0;
@@ -124,11 +125,11 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
           timer.cancel();
           return;
         }
-        
+
         setState(() {
           _recordingDuration++;
         });
-        
+
         if (_recordingDuration >= _maxDuration) {
           _stopRecording();
           timer.cancel();
@@ -149,7 +150,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
 
   Future<void> _stopRecording() async {
     if (!_isRecording) return;
-    
+
     _recordingTimer?.cancel();
     setState(() {
       _isRecording = false;
@@ -169,7 +170,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
 
       // Get the recorded video file path from the camera controller
       final videoFile = await _cameraController?.stopVideoRecording();
-      
+
       if (videoFile == null) {
         throw Exception('Failed to save recorded video');
       }
@@ -184,11 +185,12 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
           .ref()
           .child('videos')
           .child(user.uid)
-          .child('${widget.subject}_${widget.concept}_${DateTime.now().millisecondsSinceEpoch}.mp4');
+          .child(
+              '${widget.subject}_${widget.concept}_${DateTime.now().millisecondsSinceEpoch}.mp4');
 
       // Upload the video to Firebase Storage
       final uploadTask = storageRef.putFile(File(videoFile.path));
-      
+
       // Show upload progress
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
         final progress = snapshot.bytesTransferred / snapshot.totalBytes;
@@ -198,7 +200,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
       // Wait for the upload to complete
       final taskSnapshot = await uploadTask.whenComplete(() {});
       final videoUrl = await taskSnapshot.ref.getDownloadURL();
-      
+
       debugPrint('Video uploaded successfully. URL: $videoUrl');
 
       // Close the loading dialog
@@ -240,7 +242,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
     final theme = Theme.of(context);
     final remainingTime = _maxDuration - _recordingDuration;
     final progress = _recordingDuration / _maxDuration;
-    
+
     if (!_isCameraInitialized) {
       return const Scaffold(
         body: Center(
@@ -248,7 +250,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
         ),
       );
     }
-    
+
     // Format the remaining time as MM:SS
     final minutes = (remainingTime ~/ 60).toString().padLeft(2, '0');
     final seconds = (remainingTime % 60).toString().padLeft(2, '0');
@@ -267,11 +269,12 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (_cameraController != null && _cameraController!.value.isInitialized)
+                if (_cameraController != null &&
+                    _cameraController!.value.isInitialized)
                   CameraPreview(_cameraController!)
                 else
                   const Center(child: CircularProgressIndicator()),
-                  
+
                 // Recording indicator
                 if (_isRecording)
                   Positioned(
@@ -279,7 +282,8 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
                     left: 0,
                     right: 0,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       margin: const EdgeInsets.symmetric(horizontal: 32),
                       decoration: BoxDecoration(
                         color: Colors.black54,
@@ -311,7 +315,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
               ],
             ),
           ),
-          
+
           // Controls
           Container(
             padding: const EdgeInsets.all(16),
@@ -325,7 +329,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Record button
                 GestureDetector(
                   onTap: _isRecording ? _stopRecording : _startRecording,
@@ -355,7 +359,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Toggle buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -409,7 +413,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
               ],
             ),
           ),
-          
+
           // Camera preview/placeholder
           Expanded(
             child: Container(
@@ -434,7 +438,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
                     size: 64,
                     color: Colors.grey,
                   ),
-                  
+
                   // Recording indicator
                   if (_isRecording)
                     Positioned(
@@ -487,7 +491,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
               ),
             ),
           ),
-          
+
           // Recording progress
           if (_isRecording)
             Padding(
@@ -500,7 +504,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-          
+
           // Controls
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -533,7 +537,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
                   ],
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Record button
                 GestureDetector(
                   onTap: _isRecording ? _stopRecording : _startRecording,
@@ -542,10 +546,13 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
                     height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _isRecording ? Colors.red : theme.colorScheme.primary,
+                      color:
+                          _isRecording ? Colors.red : theme.colorScheme.primary,
                       boxShadow: [
                         BoxShadow(
-                          color: (_isRecording ? Colors.red : theme.colorScheme.primary)
+                          color: (_isRecording
+                                  ? Colors.red
+                                  : theme.colorScheme.primary)
                               .withOpacity(0.3),
                           blurRadius: 10,
                           spreadRadius: 2,
@@ -581,20 +588,18 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isActive 
+          color: isActive
               ? theme.colorScheme.primary.withOpacity(0.1)
               : theme.cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive 
-                ? theme.colorScheme.primary
-                : theme.dividerColor,
+            color: isActive ? theme.colorScheme.primary : theme.dividerColor,
             width: 1.5,
           ),
         ),
@@ -604,7 +609,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
             Icon(
               icon,
               size: 20,
-              color: isActive 
+              color: isActive
                   ? theme.colorScheme.primary
                   : theme.textTheme.bodyMedium?.color,
             ),
@@ -612,7 +617,7 @@ class _SenseiCaptureScreenState extends State<SenseiCaptureScreen> with WidgetsB
             Text(
               label,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: isActive 
+                color: isActive
                     ? theme.colorScheme.primary
                     : theme.textTheme.bodyMedium?.color,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,

@@ -1,13 +1,16 @@
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/core/theme/app_typography.dart';
+import 'package:study_sensei/features/common/widgets/sensei_primary_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:study_sensei/features/auth/services/auth_service.dart';
 import 'package:study_sensei/features/routes/app_routes.dart';
 
 class SubjectSelectionScreen extends StatefulWidget {
-  const SubjectSelectionScreen({Key? key}) : super(key: key);
+  const SubjectSelectionScreen({super.key});
 
   @override
-  _SubjectSelectionScreenState createState() => _SubjectSelectionScreenState();
+  State<SubjectSelectionScreen> createState() => _SubjectSelectionScreenState();
 }
 
 class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
@@ -108,7 +111,8 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving subjects: ${e.toString()}')),
+          const SnackBar(
+              content: Text('Couldn’t save your subjects. Please try again.')),
         );
       }
     } finally {
@@ -121,120 +125,86 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(140),
-        child: AppBar(
-          elevation: 4,
-          centerTitle: false,
-          titleSpacing: 0,
-          backgroundColor: Colors.transparent,
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF6C63FF), Color(0xFF7B3FF3)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Select your subjects',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Pick what you enjoy learning so we can personalize your experience.',
-                      style: TextStyle(
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('Common Subjects:'),
-                  const SizedBox(height: 8.0),
-                  Wrap(
-                    spacing: 8.0,
-                    children: _commonSubjects.map((subject) {
-                      final isSelected = _selectedSubjects.contains(subject);
-                      return FilterChip(
-                        label: Text(subject),
-                        selected: isSelected,
-                        onSelected: (_) => _toggleSubject(subject),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 24.0),
-                  const Text('Custom Subject:'),
-                  const SizedBox(height: 8.0),
-                  Row(
+      appBar: AppBar(title: const Text('Your subjects')),
+      body: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _customSubjectController,
-                          decoration: const InputDecoration(
-                            hintText: 'Add a custom subject',
-                            border: OutlineInputBorder(),
-                            contentPadding:
-                                EdgeInsets.symmetric(horizontal: 12.0),
+                      const Text('What are you learning?',
+                          style: AppTypography.pageTitle),
+                      const SizedBox(height: 8),
+                      const Text(
+                          'Choose your subjects to personalize your experience.',
+                          style: AppTypography.bodyMedium),
+                      const SizedBox(height: 24),
+                      const Text('Subjects', style: AppTypography.cardTitle),
+                      const SizedBox(height: 8.0),
+                      Wrap(
+                        spacing: 8.0,
+                        children: _commonSubjects.map((subject) {
+                          final isSelected =
+                              _selectedSubjects.contains(subject);
+                          return FilterChip(
+                            label:
+                                Text(subject, overflow: TextOverflow.ellipsis),
+                            selected: isSelected,
+                            selectedColor:
+                                AppColors.primary.withValues(alpha: 0.2),
+                            showCheckmark: true,
+                            onSelected: (_) => _toggleSubject(subject),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 24.0),
+                      const Text('Custom Subject:'),
+                      const SizedBox(height: 8.0),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _customSubjectController,
+                              decoration: const InputDecoration(
+                                hintText: 'Add a custom subject',
+                                contentPadding:
+                                    EdgeInsets.symmetric(horizontal: 12.0),
+                              ),
+                              onFieldSubmitted: (_) => _addCustomSubject(),
+                            ),
                           ),
-                          onFieldSubmitted: (_) => _addCustomSubject(),
+                          const SizedBox(width: 8.0),
+                          ElevatedButton(
+                            onPressed: _addCustomSubject,
+                            child: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16.0),
+                      if (_selectedSubjects.isNotEmpty) ...[
+                        const Text('Selected Subjects:'),
+                        const SizedBox(height: 8.0),
+                        Wrap(
+                          spacing: 8.0,
+                          children: _selectedSubjects.map((subject) {
+                            return Chip(
+                              label: Text(subject,
+                                  overflow: TextOverflow.ellipsis),
+                              onDeleted: () => _toggleSubject(subject),
+                            );
+                          }).toList(),
                         ),
-                      ),
-                      const SizedBox(width: 8.0),
-                      ElevatedButton(
-                        onPressed: _addCustomSubject,
-                        child: const Text('Add'),
-                      ),
+                        const SizedBox(height: 24.0),
+                      ],
+                      SenseiPrimaryButton(
+                          text: 'Complete Registration',
+                          onPressed: _saveSubjects,
+                          isLoading: _isLoading),
                     ],
                   ),
-                  const SizedBox(height: 16.0),
-                  if (_selectedSubjects.isNotEmpty) ...[
-                    const Text('Selected Subjects:'),
-                    const SizedBox(height: 8.0),
-                    Wrap(
-                      spacing: 8.0,
-                      children: _selectedSubjects.map((subject) {
-                        return Chip(
-                          label: Text(subject),
-                          onDeleted: () => _toggleSubject(subject),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 24.0),
-                  ],
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _saveSubjects,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    ),
-                    child: const Text('Complete Registration'),
-                  ),
-                ],
-              ),
-            ),
+                )),
     );
   }
 }

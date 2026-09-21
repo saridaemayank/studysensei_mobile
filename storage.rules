@@ -1,0 +1,77 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function groupPath(groupId) {
+      return /databases/(default)/documents/groups/$(groupId);
+    }
+
+    function groupRecord(groupId) {
+      let path = groupPath(groupId);
+      return firestore.exists(path) ? firestore.get(path).data : null;
+    }
+
+    function isGroupMember(groupId) {
+      let group = groupRecord(groupId);
+      return isSignedIn() &&
+        group != null &&
+        group.memberIds is list &&
+        group.memberIds.hasAny([request.auth.uid]);
+    }
+
+    function isGroupAdmin(groupId) {
+      let group = groupRecord(groupId);
+      return isSignedIn() &&
+        group != null &&
+        group.adminIds is list &&
+        group.adminIds.hasAny([request.auth.uid]);
+    }
+
+    function isGroupOwner(groupId) {
+      let group = groupRecord(groupId);
+      return isSignedIn() &&
+        group != null &&
+        group.createdBy == request.auth.uid;
+    }
+
+    function allowedResourceContentType() {
+      return request.resource.contentType in [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'image/jpeg',
+        'image/png',
+        'image/webp'
+      ];
+    }
+
+    function resourceFileNameIsSafe(fileName) {
+      return fileName.size() > 0 &&
+        !fileName.matches('.*[\\\\/].*');
+    }
+
+    match /dojos/{dojoId}/resources/{resourceId}/{fileName} {
+      allow read: if isGroupMember(dojoId) || isGroupAdmin(dojoId);
+
+      allow create: if isGroupMember(dojoId) &&
+        resourceFileNameIsSafe(fileName) &&
+        request.resource.size > 0 &&
+        request.resource.size <= 25 * 1024 * 1024 &&
+        allowedResourceContentType() &&
+        request.resource.metadata != null &&
+        request.resource.metadata.uploadedBy == request.auth.uid;
+
+      allow update: if false;
+
+      allow delete: if isGroupAdmin(dojoId) ||
+        isGroupOwner(dojoId) ||
+        (isGroupMember(dojoId) &&
+          resource.metadata.uploadedBy == request.auth.uid);
+    }
+  }
+}

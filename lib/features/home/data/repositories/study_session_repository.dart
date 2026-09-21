@@ -18,7 +18,10 @@ class StudySessionRepository {
   }
 
   CollectionReference<Map<String, dynamic>> get _sessionCollection {
-    return _firestore.collection('users').doc(_userId).collection('studySessions');
+    return _firestore
+        .collection('users')
+        .doc(_userId)
+        .collection('studySessions');
   }
 
   Future<DocumentReference<Map<String, dynamic>>> createSession(
@@ -28,7 +31,8 @@ class StudySessionRepository {
     return _sessionCollection.add(data);
   }
 
-  Future<void> updateSession(String sessionId, Map<String, dynamic> data) async {
+  Future<void> updateSession(
+      String sessionId, Map<String, dynamic> data) async {
     data['updatedAt'] = FieldValue.serverTimestamp();
     await _sessionCollection.doc(sessionId).update(data);
   }

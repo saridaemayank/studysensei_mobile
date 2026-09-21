@@ -171,6 +171,8 @@ class BackendService {
       }
 
       final displayName = currentUser.displayName?.trim();
+      final idToken = await currentUser.getIdToken();
+      final kickoffPrompt = _buildSatoriKickoffPrompt(subject, concept);
 
       final uri = Uri.parse(_satoriSessionUrl).replace(
         queryParameters: {
@@ -178,13 +180,21 @@ class BackendService {
           if (displayName != null && displayName.isNotEmpty)
             'name': displayName,
           'ttl': '3600',
-          // Instruct backend to dispatch the Satori agent worker for this user.
           'agent': 'true',
+          'subject': subject,
+          'concept': concept,
+          'topic': '$subject - $concept',
+          'kickoffPrompt': kickoffPrompt,
           if (roomName != null && roomName.isNotEmpty) 'roomName': roomName,
         },
       );
 
-      final response = await http.get(uri);
+      final response = await http.get(
+        uri,
+        headers: {
+          if (idToken != null) 'Authorization': 'Bearer $idToken',
+        },
+      );
 
       if (response.statusCode != 200) {
         throw HttpException(
@@ -214,6 +224,34 @@ class BackendService {
           stackTrace: stackTrace);
       rethrow;
     }
+  }
+
+  Future<void> cancelSatoriDispatch(LiveKitCredentials credentials) async {
+    final cancelUrl = credentials.dispatchCancelUrl;
+    if (cancelUrl == null || cancelUrl.isEmpty) return;
+
+    try {
+      final uri = Uri.parse(cancelUrl);
+      final response = await http.post(uri);
+      if (response.statusCode >= 400) {
+        log(
+          'Failed to cancel Satori dispatch (status ${response.statusCode})',
+        );
+      }
+    } catch (e, stackTrace) {
+      log('Unable to cancel Satori dispatch: $e', stackTrace: stackTrace);
+    }
+  }
+
+  String _buildSatoriKickoffPrompt(String subject, String concept) {
+    final trimmedSubject = subject.trim().isEmpty ? 'general studies' : subject;
+    final trimmedConcept =
+        concept.trim().isEmpty ? "students' doubts" : concept;
+
+    return 'You are Satori, a warm voice tutor that opens the session by '
+        'introducing yourself and offering to help with $trimmedConcept in '
+        '$trimmedSubject. Greet the student and start guiding them even if '
+        'they do not speak first.';
   }
 
   /// Generates a lesson using the video URL and returns a session

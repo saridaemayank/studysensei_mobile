@@ -1,10 +1,13 @@
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/core/theme/app_typography.dart';
+import 'package:study_sensei/features/common/widgets/sensei_primary_button.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:study_sensei/features/auth/providers/user_provider.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -16,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isNavigating = false;
 
   @override
   void dispose() {
@@ -27,9 +31,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -53,21 +54,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 16.0),
+                    const Text('StudySensei', style: AppTypography.cardTitle),
+                    const SizedBox(height: 24),
                     const Text(
-                      'Welcome Back!',
-                      style: TextStyle(
-                        fontFamily: 'Headings',
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3748),
-                      ),
+                      'Welcome back.',
+                      style: AppTypography.pageTitle,
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8.0),
                     Text(
-                      'Your personal AI mentor awaits.',
+                      'Show. Understand. Learn.',
                       style: Theme.of(
                         context,
-                      ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
+                      )
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -79,7 +81,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
@@ -103,6 +104,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
+                      tooltip:
+                          _obscurePassword ? 'Show password' : 'Hide password',
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_off
@@ -114,7 +117,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                       },
                     ),
-                    border: const OutlineInputBorder(),
                   ),
                   obscureText: _obscurePassword,
                   validator: (value) {
@@ -134,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Text(
                       'Forgot Password?',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context).primaryColor,
+                            color: AppColors.primary,
                             fontWeight: FontWeight.w500,
                           ),
                     ),
@@ -142,30 +144,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24.0),
 
-                // Login Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
+                SenseiPrimaryButton(
+                    text: 'Login',
                     onPressed: _submitForm,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text(
-                      'Login',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
+                    isLoading: _isLoading),
                 const SizedBox(height: 24.0),
 
                 // Sign Up Link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       "Don't have an account? ",
@@ -175,7 +163,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/register');
+                        if (_isLoading || _isNavigating) return;
+                        _isNavigating = true;
+                        FocusScope.of(context).unfocus();
+                        Navigator.of(context).pushReplacementNamed('/register');
                       },
                       child: const Text(
                         'Sign Up',
@@ -237,6 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submitForm() async {
+    if (_isLoading || _isNavigating) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -253,7 +245,10 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
 
-      // No need to navigate here - the auth state listener in UserProvider will handle it
+      if (!mounted) return;
+      _isNavigating = true;
+      FocusScope.of(context).unfocus();
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     } on FirebaseAuthException catch (e) {
       String message = 'An error occurred. Please try again.';
 

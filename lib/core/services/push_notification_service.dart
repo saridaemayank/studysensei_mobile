@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +27,7 @@ class PushNotificationService {
   bool _initialized = false;
   bool _permissionGranted = false;
   String? _currentUserId;
+  String? _registeredToken;
   RemoteMessage? _pendingNavigationMessage;
   bool get _isApplePlatform =>
       !kIsWeb &&
@@ -41,6 +41,10 @@ class PushNotificationService {
 
   Future<void> initialize() async {
     if (_initialized) return;
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
 
     final settings = await _messaging.requestPermission(
       alert: true,
@@ -52,9 +56,9 @@ class PushNotificationService {
       sound: true,
     );
 
-    _permissionGranted = settings.authorizationStatus ==
-            AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+    _permissionGranted =
+        settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
 
     if (_permissionGranted) {
       await _messaging.setForegroundNotificationPresentationOptions(
@@ -92,6 +96,24 @@ class PushNotificationService {
   Future<void> onUserSignedIn(String uid) async {
     _currentUserId = uid;
     await _registerToken();
+    final pending = _pendingNavigationMessage;
+    if (pending != null) {
+      _pendingNavigationMessage = null;
+      await _handleMessageNavigation(pending);
+    }
+  }
+
+  Future<void> unregisterDevice() async {
+    final uid = _auth.currentUser?.uid;
+    final token = _registeredToken;
+    if (uid != null && token != null) {
+      await _firestore.doc('users/$uid/private/push').update({
+        'tokens': FieldValue.arrayRemove([token]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      await _messaging.deleteToken();
+    }
+    _registeredToken = null;
   }
 
   /// Clears local state when the user signs out.
@@ -157,18 +179,34 @@ class PushNotificationService {
       return;
     }
 
-    await _firestore.collection('users').doc(uid).set({
-      'fcmToken': resolvedToken,
-      'fcmTokens': [resolvedToken],
-      'tokens': [resolvedToken],
-      'lastFcmTokenUpdate': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
-    final previewLength =
-        resolvedToken.length >= 12 ? 12 : resolvedToken.length;
-    debugPrint(
-      'PushNotificationService: Registered token for $uid (${resolvedToken.substring(0, previewLength)}...).',
-    );
+    if (_auth.currentUser?.uid != uid) return;
+    final tokenRef = _firestore.doc('users/$uid/private/push');
+    final batch = _firestore.batch();
+    batch.set(
+        tokenRef,
+        {
+          'tokens': FieldValue.arrayUnion([resolvedToken]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true));
+    batch.set(
+        _firestore.collection('users').doc(uid),
+        {
+          'fcmToken': FieldValue.delete(),
+          'fcmTokens': FieldValue.delete(),
+          'tokens': FieldValue.delete(),
+          'lastFcmTokenUpdate': FieldValue.delete(),
+        },
+        SetOptions(merge: true));
+    await batch.commit();
+    final previousToken = _registeredToken;
+    _registeredToken = resolvedToken;
+    if (previousToken != null && previousToken != resolvedToken) {
+      await tokenRef.update({
+        'tokens': FieldValue.arrayRemove([previousToken]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
@@ -195,7 +233,7 @@ class PushNotificationService {
         message.data['body'] ??
         message.notification?.body ??
         '';
-    final title = 'You have a new message from $groupName';
+    final title = message.notification?.title ?? 'New message from $groupName';
     final subtitle = messagePreview.isNotEmpty
         ? '$senderName: $messagePreview'
         : 'Sent by $senderName';
@@ -262,6 +300,7 @@ class PushNotificationService {
 
     final user = _auth.currentUser;
     if (user == null) {
+      _pendingNavigationMessage = message;
       debugPrint(
         'PushNotificationService: User not authenticated, cannot open group chat.',
       );
@@ -269,8 +308,7 @@ class PushNotificationService {
     }
 
     try {
-      final groupDoc =
-          await _firestore.collection('groups').doc(groupId).get();
+      final groupDoc = await _firestore.collection('groups').doc(groupId).get();
       if (!groupDoc.exists || groupDoc.data() == null) {
         debugPrint(
           'PushNotificationService: Group $groupId does not exist, cannot open.',
@@ -279,6 +317,8 @@ class PushNotificationService {
       }
 
       final group = Group.fromMap(groupDoc.id, groupDoc.data()!);
+      if (!group.memberIds.contains(user.uid) ||
+          _auth.currentUser?.uid != user.uid) return;
 
       final assignmentBloc = AssignmentBloc()..add(LoadAssignments(group.id));
 

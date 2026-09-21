@@ -19,7 +19,7 @@ class LanguageVoicePicker extends StatefulWidget {
 class _LanguageVoicePickerState extends State<LanguageVoicePicker> {
   late String _selectedLanguage;
   late String _selectedVoice;
-  
+
   // In a real app, these would come from a service
   final Map<String, List<String>> _languageVoices = {
     'English': ['Emma (Neural)', 'Brian (Neural)', 'Amy (Neural)'],
@@ -34,7 +34,7 @@ class _LanguageVoicePickerState extends State<LanguageVoicePicker> {
     super.initState();
     _selectedLanguage = widget.initialLanguage;
     _selectedVoice = widget.initialVoice;
-    
+
     // If the initial voice isn't in the selected language's voices, select the first one
     if (!_languageVoices[_selectedLanguage]!.contains(_selectedVoice)) {
       _selectedVoice = _languageVoices[_selectedLanguage]!.first;
@@ -45,7 +45,7 @@ class _LanguageVoicePickerState extends State<LanguageVoicePicker> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -66,7 +66,7 @@ class _LanguageVoicePickerState extends State<LanguageVoicePicker> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Language dropdown
           DropdownButtonFormField<String>(
             value: _selectedLanguage,
@@ -96,9 +96,9 @@ class _LanguageVoicePickerState extends State<LanguageVoicePicker> {
               }
             },
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Voice dropdown
           DropdownButtonFormField<String>(
             value: _selectedVoice,
@@ -128,7 +128,7 @@ class _LanguageVoicePickerState extends State<LanguageVoicePicker> {
               }
             },
           ),
-          
+
           // Preview button
           const SizedBox(height: 16),
           OutlinedButton.icon(
@@ -151,7 +151,7 @@ class _LanguageVoicePickerState extends State<LanguageVoicePicker> {
       ),
     );
   }
-  
+
   void _playVoicePreview() {
     // In a real app, this would play a preview of the selected voice
     // For now, we'll just show a snackbar

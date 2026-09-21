@@ -20,7 +20,7 @@ class LoadingOverlay extends StatelessWidget {
       children: [
         // Main content
         child,
-        
+
         // Loading overlay
         if (isLoading)
           Positioned.fill(

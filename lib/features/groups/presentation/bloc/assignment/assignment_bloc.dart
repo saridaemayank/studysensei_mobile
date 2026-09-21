@@ -191,8 +191,7 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
         final assignedTo = List<String>.from(data['assignedTo'] ?? []);
 
         // Check if all assigned users have completed the assignment
-        final allCompleted =
-            assignedTo.isNotEmpty &&
+        final allCompleted = assignedTo.isNotEmpty &&
             assignedTo.every((userId) => userCompletion[userId] == true);
 
         // Update the status based on completion
@@ -269,30 +268,30 @@ class AssignmentBloc extends Bloc<AssignmentEvent, AssignmentState> {
           .orderBy('createdAt', descending: true)
           .snapshots()
           .listen(
-            (snapshot) {
-              if (isClosed) return;
+        (snapshot) {
+          if (isClosed) return;
 
-              try {
-                final updatedAssignments = snapshot.docs
-                    .map((doc) => GroupAssignment.fromMap(doc.id, doc.data()))
-                    .toList();
+          try {
+            final updatedAssignments = snapshot.docs
+                .map((doc) => GroupAssignment.fromMap(doc.id, doc.data()))
+                .toList();
 
-                _assignmentsCache[event.groupId] = updatedAssignments;
-                add(UpdateAssignments(updatedAssignments));
-              } catch (e) {
-                print('AssignmentBloc - Error parsing assignments: $e');
-                if (!isClosed) {
-                  emit(AssignmentError('Error updating assignments: $e'));
-                }
-              }
-            },
-            onError: (e) {
-              print('AssignmentBloc - Firestore error: $e');
-              if (!isClosed) {
-                emit(AssignmentError('Failed to update assignments: $e'));
-              }
-            },
-          );
+            _assignmentsCache[event.groupId] = updatedAssignments;
+            add(UpdateAssignments(updatedAssignments));
+          } catch (e) {
+            print('AssignmentBloc - Error parsing assignments: $e');
+            if (!isClosed) {
+              emit(AssignmentError('Error updating assignments: $e'));
+            }
+          }
+        },
+        onError: (e) {
+          print('AssignmentBloc - Firestore error: $e');
+          if (!isClosed) {
+            emit(AssignmentError('Failed to update assignments: $e'));
+          }
+        },
+      );
     } catch (e) {
       print('AssignmentBloc - Error in _onLoadAssignments: $e');
       if (!isClosed) {

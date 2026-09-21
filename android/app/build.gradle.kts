@@ -17,13 +17,13 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.mayank.study_sensei"
     compileSdk = 36
-    ndkVersion = "26.1.10909125"
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.mayank.study_sensei"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 15
+        versionCode = 17
         versionName = flutter.versionName
         multiDexEnabled = true
     }

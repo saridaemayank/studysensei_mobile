@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/core/theme/app_typography.dart';
+import 'package:study_sensei/features/common/widgets/sensei_card.dart';
 import 'package:study_sensei/features/friends/data/models/friend_request_model.dart';
 
 class PendingRequestsCard extends StatelessWidget {
@@ -19,19 +22,8 @@ class PendingRequestsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+    return SenseiCard(
+      padding: const EdgeInsets.all(16),
       child: loading
           ? const Center(
               child: CircularProgressIndicator(),
@@ -40,11 +32,12 @@ class PendingRequestsCard extends StatelessWidget {
               ? Column(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
-                    Icon(Icons.people_outline, size: 48, color: Colors.grey),
+                    Icon(Icons.people_outline,
+                        size: 48, color: AppColors.textSecondary),
                     SizedBox(height: 12),
                     Text(
                       'No pending requests',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                      style: AppTypography.bodyLarge,
                     ),
                   ],
                 )
@@ -82,81 +75,46 @@ class _PendingRequestRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.orangeAccent.shade200,
-                Colors.pinkAccent.shade200,
-              ],
-            ),
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: Text(
-              request.senderName.isNotEmpty
-                  ? request.senderName[0].toUpperCase()
-                  : '?',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                request.senderName,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                request.senderEmail,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              Text(
-                'Sent ${_formatRelativeTime(request.sentAt)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        Column(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ElevatedButton(
-              onPressed: onAccept,
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-              child: const Text('Accept'),
+            const CircleAvatar(
+              backgroundColor: AppColors.surfaceHighlight,
+              foregroundColor: AppColors.primaryLight,
+              child: Icon(Icons.person_outline),
             ),
-            TextButton(
-              onPressed: onDecline,
-              style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.error,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(request.senderName, style: AppTypography.cardTitle),
+                  const SizedBox(height: 4),
+                  Text(request.senderEmail, style: AppTypography.bodyMedium),
+                  Text('Sent ${_formatRelativeTime(request.sentAt)}',
+                      style: AppTypography.bodyMedium),
+                ],
               ),
-              child: const Text('Decline'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            Semantics(
+              label: 'Accept request from ${request.senderName}',
+              child: ElevatedButton(
+                  onPressed: onAccept, child: const Text('Accept')),
+            ),
+            Semantics(
+              label: 'Decline request from ${request.senderName}',
+              child: TextButton(
+                  onPressed: onDecline, child: const Text('Decline')),
             ),
           ],
         ),

@@ -18,16 +18,16 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<List<UserModel>> searchUsers(String query) async {
     print('Searching users with query: $query');
     if (query.isEmpty) return [];
-    
+
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
       print('No current user ID found');
       return [];
     }
-    
+
     // Convert query to lowercase for case-insensitive search
     final searchQuery = query.trim().toLowerCase();
-    
+
     try {
       // First, try searching by name (case-insensitive)
       final nameQuery = _firestore
@@ -35,23 +35,23 @@ class FriendRepositoryImpl implements FriendRepository {
           .where('name', isGreaterThanOrEqualTo: searchQuery)
           .where('name', isLessThanOrEqualTo: '$searchQuery\uf8ff')
           .limit(10);
-      
+
       // Then try searching by email (case-insensitive)
       final emailQuery = _firestore
           .collection('users')
           .where('email', isGreaterThanOrEqualTo: searchQuery)
           .where('email', isLessThanOrEqualTo: '$searchQuery\uf8ff')
           .limit(10);
-      
+
       // Execute queries in parallel
       final results = await Future.wait([
         nameQuery.get(),
         emailQuery.get(),
       ]);
-      
+
       // Combine and deduplicate results
       final users = <String, UserModel>{};
-      
+
       for (final snapshot in results) {
         for (final doc in snapshot.docs) {
           // Skip current user from search results
@@ -66,7 +66,7 @@ class FriendRepositoryImpl implements FriendRepository {
           }
         }
       }
-      
+
       print('Found ${users.length} users matching "$searchQuery"');
       return users.values.toList();
     } catch (e, stackTrace) {
@@ -83,11 +83,11 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<void> sendFriendRequest(String recipientId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) throw Exception('User not authenticated');
-    
+
     if (currentUserId == recipientId) {
       throw Exception('Cannot send friend request to yourself');
     }
-    
+
     // Check if request already exists
     final existingRequest = await _firestore
         .collection('friend_requests')
@@ -95,11 +95,11 @@ class FriendRepositoryImpl implements FriendRepository {
         .where('toUserId', isEqualTo: recipientId)
         .limit(1)
         .get();
-    
+
     if (existingRequest.docs.isNotEmpty) {
       throw Exception('Friend request already sent');
     }
-    
+
     // Create new friend request
     await _firestore.collection('friend_requests').add({
       'fromUserId': currentUserId,
@@ -122,10 +122,11 @@ class FriendRepositoryImpl implements FriendRepository {
           .get();
 
       final requests = <FriendRequestModel>[];
-      
+
       for (final doc in querySnapshot.docs) {
         // Get sender's details
-        final senderDoc = await _firestore.collection('users').doc(doc['fromUserId']).get();
+        final senderDoc =
+            await _firestore.collection('users').doc(doc['fromUserId']).get();
         if (senderDoc.exists) {
           requests.add(FriendRequestModel.fromMap(
             doc.id,
@@ -137,7 +138,7 @@ class FriendRepositoryImpl implements FriendRepository {
           ));
         }
       }
-      
+
       return requests;
     } catch (e) {
       print('Error getting friend requests: $e');
@@ -156,7 +157,7 @@ class FriendRepositoryImpl implements FriendRepository {
 
     final batch = _firestore.batch();
     final requestRef = _firestore.collection('friend_requests').doc(requestId);
-    
+
     // Update the request status
     batch.update(requestRef, {
       'status': isAccepted ? 'accepted' : 'rejected',
@@ -170,7 +171,7 @@ class FriendRepositoryImpl implements FriendRepository {
           .doc(currentUserId)
           .collection('friends')
           .doc(senderId);
-          
+
       final senderFriendsRef = _firestore
           .collection('users')
           .doc(senderId)
@@ -181,7 +182,7 @@ class FriendRepositoryImpl implements FriendRepository {
         'friendId': senderId,
         'since': FieldValue.serverTimestamp(),
       });
-      
+
       batch.set(senderFriendsRef, {
         'friendId': currentUserId,
         'since': FieldValue.serverTimestamp(),
@@ -211,7 +212,7 @@ class FriendRepositoryImpl implements FriendRepository {
               .collection('users')
               .doc(doc['friendId'] as String)
               .get();
-          
+
           if (userDoc.exists) {
             return UserModel.fromMap(userDoc.id, userDoc.data()!);
           }
@@ -224,7 +225,7 @@ class FriendRepositoryImpl implements FriendRepository {
 
       // Wait for all friend details to load
       final friends = await Future.wait(friendFutures);
-      
+
       // Remove any null values and return
       return friends.whereType<UserModel>().toList();
     } catch (e) {
@@ -239,7 +240,7 @@ class FriendRepositoryImpl implements FriendRepository {
     if (currentUserId == null) throw Exception('User not authenticated');
 
     final batch = _firestore.batch();
-    
+
     // Remove from current user's friends
     batch.delete(
       _firestore
@@ -248,7 +249,7 @@ class FriendRepositoryImpl implements FriendRepository {
           .collection('friends')
           .doc(friendId),
     );
-    
+
     // Remove from friend's friends
     batch.delete(
       _firestore
@@ -257,7 +258,7 @@ class FriendRepositoryImpl implements FriendRepository {
           .collection('friends')
           .doc(currentUserId),
     );
-    
+
     await batch.commit();
   }
 
@@ -265,7 +266,7 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<bool> hasPendingRequest(String userId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return false;
-    
+
     final snapshot = await _firestore
         .collection('friend_requests')
         .where('fromUserId', isEqualTo: currentUserId)
@@ -273,7 +274,7 @@ class FriendRepositoryImpl implements FriendRepository {
         .where('status', isEqualTo: 'pending')
         .limit(1)
         .get();
-    
+
     return snapshot.docs.isNotEmpty;
   }
 
@@ -281,14 +282,14 @@ class FriendRepositoryImpl implements FriendRepository {
   Future<bool> isFriend(String userId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return false;
-    
+
     final doc = await _firestore
         .collection('users')
         .doc(currentUserId)
         .collection('friends')
         .doc(userId)
         .get();
-    
+
     return doc.exists;
   }
 }

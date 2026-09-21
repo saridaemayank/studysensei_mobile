@@ -4,6 +4,9 @@ class LiveKitCredentials {
   final String? roomName;
   final String? agentIdentity;
   final Map<String, dynamic>? dispatch;
+  final String? dispatchJobId;
+  final String? dispatchCancelUrl;
+  final String? dispatchStatusUrl;
 
   const LiveKitCredentials({
     required this.url,
@@ -11,6 +14,9 @@ class LiveKitCredentials {
     this.roomName,
     this.agentIdentity,
     this.dispatch,
+    this.dispatchJobId,
+    this.dispatchCancelUrl,
+    this.dispatchStatusUrl,
   });
 
   factory LiveKitCredentials.fromJson(Map<String, dynamic> json) {
@@ -37,7 +43,46 @@ class LiveKitCredentials {
       dispatch: normalized['dispatch'] is Map<String, dynamic>
           ? normalized['dispatch'] as Map<String, dynamic>
           : null,
+      dispatchJobId: _stringFromDispatch(normalized, ['dispatch', 'jobId']),
+      dispatchCancelUrl: _stringFromDispatch(
+        normalized,
+        ['dispatch', 'cancelUrl'],
+      ),
+      dispatchStatusUrl: _stringFromDispatch(
+        normalized,
+        ['dispatch', 'statusUrl'],
+      ),
     );
+  }
+
+  static String? _stringFromDispatch(
+    Map<String, dynamic> json,
+    List<String> path,
+  ) {
+    dynamic current = json;
+    for (final key in path) {
+      if (current is Map<String, dynamic>) {
+        if (current.containsKey(key)) {
+          current = current[key];
+        } else {
+          // Snake_case fallback (e.g. cancel_url).
+          final snakeKey = key
+              .replaceAllMapped(
+                RegExp('[A-Z]'),
+                (m) => '_${m.group(0)!.toLowerCase()}',
+              )
+              .replaceAll('__', '_');
+          if (current.containsKey(snakeKey)) {
+            current = current[snakeKey];
+          } else {
+            return null;
+          }
+        }
+      } else {
+        return null;
+      }
+    }
+    return current is String ? current : null;
   }
 
   static Map<String, dynamic> _normalizePayload(Map<String, dynamic> json) {

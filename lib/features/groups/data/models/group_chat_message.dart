@@ -10,6 +10,10 @@ class GroupChatMessage extends Equatable {
   final String text;
   final DateTime sentAt;
   final DateTime? editedAt;
+  final String? replyToMessageId;
+  final String? replyToSenderId;
+  final String? replyToSenderName;
+  final String? replyPreview;
 
   const GroupChatMessage({
     required this.id,
@@ -20,6 +24,10 @@ class GroupChatMessage extends Equatable {
     required this.sentAt,
     this.senderPhotoUrl,
     this.editedAt,
+    this.replyToMessageId,
+    this.replyToSenderId,
+    this.replyToSenderName,
+    this.replyPreview,
   });
 
   Map<String, dynamic> toMap() {
@@ -31,6 +39,10 @@ class GroupChatMessage extends Equatable {
       'text': text,
       'sentAt': FieldValue.serverTimestamp(),
       'editedAt': null,
+      if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
+      if (replyToSenderId != null) 'replyToSenderId': replyToSenderId,
+      if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
+      if (replyPreview != null) 'replyPreview': replyPreview,
     };
   }
 
@@ -69,6 +81,10 @@ class GroupChatMessage extends Equatable {
       text: data['text']?.toString() ?? '',
       sentAt: sentAt,
       editedAt: editedAt,
+      replyToMessageId: data['replyToMessageId']?.toString(),
+      replyToSenderId: data['replyToSenderId']?.toString(),
+      replyToSenderName: data['replyToSenderName']?.toString(),
+      replyPreview: data['replyPreview']?.toString(),
     );
   }
 
@@ -84,5 +100,9 @@ class GroupChatMessage extends Equatable {
         text,
         sentAt,
         editedAt,
+        replyToMessageId,
+        replyToSenderId,
+        replyToSenderName,
+        replyPreview,
       ];
 }

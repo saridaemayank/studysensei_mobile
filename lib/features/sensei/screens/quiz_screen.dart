@@ -31,15 +31,15 @@ class _QuizScreenState extends State<QuizScreen> {
     setState(() {
       _selectedOptionIndex = index;
       _showResult = true;
-      
-      final isCorrect = widget.lesson.quizQuestions[_currentQuestionIndex]
-          .isCorrect(index);
-      
+
+      final isCorrect =
+          widget.lesson.quizQuestions[_currentQuestionIndex].isCorrect(index);
+
       if (isCorrect) {
         _score++;
         _questionResults[_currentQuestionIndex] = true;
       }
-      
+
       _isCorrect = isCorrect;
     });
   }
@@ -59,7 +59,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void _showQuizResults() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -133,11 +133,11 @@ class _QuizScreenState extends State<QuizScreen> {
   }) {
     Color? borderColor;
     Color? backgroundColor;
-    
+
     if (_showResult) {
       if (isSelected) {
-        backgroundColor = isCorrect 
-            ? Colors.green.withOpacity(0.1) 
+        backgroundColor = isCorrect
+            ? Colors.green.withOpacity(0.1)
             : Colors.red.withOpacity(0.1);
         borderColor = isCorrect ? Colors.green : Colors.red;
       } else if (isCorrect) {
@@ -148,7 +148,7 @@ class _QuizScreenState extends State<QuizScreen> {
       backgroundColor = colorScheme.primary.withOpacity(0.1);
       borderColor = colorScheme.primary;
     }
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: OutlinedButton(
@@ -178,9 +178,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   color: borderColor ?? colorScheme.outline,
                   width: 2,
                 ),
-                color: isSelected 
-                    ? borderColor ?? colorScheme.primary 
-                    : null,
+                color: isSelected ? borderColor ?? colorScheme.primary : null,
               ),
               child: isSelected
                   ? Icon(
@@ -204,14 +202,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildExplanation(String? explanation) {
     if (!_showResult || explanation == null) return const SizedBox.shrink();
-    
+
     return Padding(
       padding: const EdgeInsets.only(top: 16.0, bottom: 24.0),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _isCorrect 
-              ? Colors.green.withOpacity(0.1) 
+          color: _isCorrect
+              ? Colors.green.withOpacity(0.1)
               : Colors.red.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -256,13 +254,14 @@ class _QuizScreenState extends State<QuizScreen> {
           // Progress indicator
           ClipRRect(
             child: LinearProgressIndicator(
-              value: (_currentQuestionIndex + 1) / widget.lesson.quizQuestions.length,
+              value: (_currentQuestionIndex + 1) /
+                  widget.lesson.quizQuestions.length,
               backgroundColor: colorScheme.surfaceVariant,
               color: colorScheme.primary,
               minHeight: 4,
             ),
           ),
-          
+
           // Question counter
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -286,7 +285,7 @@ class _QuizScreenState extends State<QuizScreen> {
               ],
             ),
           ),
-          
+
           // Question card
           Expanded(
             child: SingleChildScrollView(
@@ -308,9 +307,9 @@ class _QuizScreenState extends State<QuizScreen> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Options
                   ListView.builder(
                     shrinkWrap: true,
@@ -319,7 +318,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     itemBuilder: (context, index) {
                       final isSelected = _selectedOptionIndex == index;
                       final isCorrect = question.isCorrect(index);
-                      
+
                       return _buildOptionButton(
                         context: context,
                         option: question.options[index],
@@ -331,14 +330,14 @@ class _QuizScreenState extends State<QuizScreen> {
                       );
                     },
                   ),
-                  
+
                   // Explanation
                   _buildExplanation(question.explanation),
                 ],
               ),
             ),
           ),
-          
+
           // Next button
           if (_showResult)
             Padding(
@@ -353,7 +352,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
                 child: Text(
                   _currentQuestionIndex < widget.lesson.quizQuestions.length - 1
-                      ? 'Next Question' 
+                      ? 'Next Question'
                       : 'See Results',
                 ),
               ),

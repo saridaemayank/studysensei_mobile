@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 
 import '../../home/data/models/long_term_goal.dart';
@@ -8,8 +9,9 @@ import '../../home/data/models/milestone.dart';
 import 'firebase_service.dart';
 
 class AddAssignmentPage extends StatefulWidget {
+  const AddAssignmentPage({super.key});
   @override
-  _AddAssignmentPageState createState() => _AddAssignmentPageState();
+  State<AddAssignmentPage> createState() => _AddAssignmentPageState();
 }
 
 class _AddAssignmentPageState extends State<AddAssignmentPage> {
@@ -30,16 +32,9 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
 
   // Predefined colors for subjects
   final List<Color> _availableColors = [
-    Colors.red,
-    Colors.green,
-    Colors.blue,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-    Colors.amber,
-    Colors.cyan,
-    Colors.indigo,
+    AppColors.primary,
+    AppColors.info,
+    AppColors.primaryLight,
   ];
 
   @override
@@ -115,7 +110,7 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to load goals: $e')),
+          const SnackBar(content: Text("Couldn't load this right now.")),
         );
       }
     }
@@ -164,7 +159,9 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving assignment: $e')),
+          const SnackBar(
+              content:
+                  Text("Couldn't save your assignment. Please try again.")),
         );
       }
     } finally {
@@ -233,7 +230,6 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                     controller: _nameController,
                     decoration: const InputDecoration(
                       labelText: 'Assignment Name',
-                      border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -244,12 +240,13 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                   ),
                   const SizedBox(height: 16),
                   subjects.isEmpty
-                      ? const Text('No subjects found. Please add subjects first.')
+                      ? const Text(
+                          'No subjects found. Please add subjects first.')
                       : DropdownButtonFormField<String>(
-                          value: _selectedSubject,
+                          isExpanded: true,
+                          initialValue: _selectedSubject,
                           decoration: const InputDecoration(
                             labelText: 'Subject',
-                            border: OutlineInputBorder(),
                           ),
                           items: subjects.map((subject) {
                             return DropdownMenuItem(
@@ -260,12 +257,15 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                                     width: 16,
                                     height: 16,
                                     decoration: BoxDecoration(
-                                      color: subjectColors[subject] ?? Colors.grey,
+                                      color: subjectColors[subject] ??
+                                          AppColors.textSecondary,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-                                  Text(subject),
+                                  Expanded(
+                                      child: Text(subject,
+                                          overflow: TextOverflow.ellipsis)),
                                 ],
                               ),
                             );
@@ -293,7 +293,6 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: 'Date',
-                              border: OutlineInputBorder(),
                             ),
                             child: Text(
                               DateFormat('MMM d, yyyy').format(_deadline),
@@ -308,7 +307,6 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                           child: InputDecorator(
                             decoration: const InputDecoration(
                               labelText: 'Time',
-                              border: OutlineInputBorder(),
                             ),
                             child: Text(DateFormat('h:mm a').format(_deadline)),
                           ),
@@ -317,75 +315,80 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('Link to a milestone'),
-                    value: _linkToMilestone,
-                    onChanged: (value) {
-                      setState(() {
-                        _linkToMilestone = value;
-                        if (!value) {
-                          _selectedGoalId = null;
-                          _selectedMilestoneId = null;
-                        }
-                      });
-                    },
-                  ),
-                  if (_linkToMilestone) ...[
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedGoalId,
-                      decoration: const InputDecoration(
-                        labelText: 'Goal',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _goals
-                          .map(
-                            (goal) => DropdownMenuItem(
-                              value: goal.id,
-                              child: Text(goal.title),
+                  // Legacy linking remains available in code, outside the current UI.
+                  Visibility(
+                      visible: false,
+                      child: Column(children: [
+                        SwitchListTile(
+                          title: const Text('Link to a milestone'),
+                          value: _linkToMilestone,
+                          onChanged: (value) {
+                            setState(() {
+                              _linkToMilestone = value;
+                              if (!value) {
+                                _selectedGoalId = null;
+                                _selectedMilestoneId = null;
+                              }
+                            });
+                          },
+                        ),
+                        if (_linkToMilestone) ...[
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            initialValue: _selectedGoalId,
+                            decoration: const InputDecoration(
+                              labelText: 'Goal',
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedGoalId = value;
-                          _selectedMilestoneId = null;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _selectedMilestoneId,
-                      decoration: const InputDecoration(
-                        labelText: 'Milestone',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: (_goalMilestones[_selectedGoalId] ?? [])
-                          .map(
-                            (milestone) => DropdownMenuItem(
-                              value: milestone.id,
-                              child: Text(milestone.title),
+                            items: _goals
+                                .map(
+                                  (goal) => DropdownMenuItem(
+                                    value: goal.id,
+                                    child: Text(goal.title),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedGoalId = value;
+                                _selectedMilestoneId = null;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            initialValue: _selectedMilestoneId,
+                            decoration: const InputDecoration(
+                              labelText: 'Milestone',
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedMilestoneId = value;
-                        });
-                      },
-                    ),
-                  ],
+                            items: (_goalMilestones[_selectedGoalId] ?? [])
+                                .map(
+                                  (milestone) => DropdownMenuItem(
+                                    value: milestone.id,
+                                    child: Text(milestone.title),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedMilestoneId = value;
+                              });
+                            },
+                          ),
+                        ],
+                      ])),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
                     child: ElevatedButton(
                       onPressed: _isSaving ? null : _saveAssignment,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
                       child: _isSaving
@@ -396,10 +399,14 @@ class _AddAssignmentPageState extends State<AddAssignmentPage> {
                             )
                           : Text(
                               'Save Assignment',
-                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelLarge
+                                  ?.copyWith(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).colorScheme.onPrimary,
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
                                   ),
                             ),
                     ),

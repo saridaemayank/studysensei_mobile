@@ -50,7 +50,8 @@ class HomeHeader extends StatelessWidget {
           onTap: onAvatarTap,
           child: CircleAvatar(
             radius: 24,
-            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+            backgroundImage:
+                avatarUrl != null ? NetworkImage(avatarUrl!) : null,
             child: avatarUrl == null ? const Icon(Icons.person) : null,
           ),
         ),

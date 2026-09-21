@@ -1,18 +1,16 @@
-import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:study_sensei/core/services/push_notification_service.dart';
 import 'package:flutter/material.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:study_sensei/features/auth/login/screens/login_screen.dart';
 import 'package:study_sensei/features/common/services/media_picker_service.dart';
-import 'package:study_sensei/features/common/widgets/premium_celebration_overlay.dart';
 import 'package:study_sensei/features/friends/data/models/friend_request_model.dart';
 import 'package:study_sensei/features/friends/data/repositories/friend_repository_impl.dart';
 import 'package:study_sensei/features/friends/domain/repositories/friend_repository.dart';
-import 'package:study_sensei/core/services/app_lock_provider.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/features/common/widgets/sensei_primary_button.dart';
+import 'profile_view.dart';
 import '../../models/user_preferences.dart';
 import '../../providers/user_provider.dart';
 import 'pending_requests_card.dart';
@@ -25,21 +23,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  static const Duration _freeWeeklyAllowance = Duration(minutes: 5);
-  static const Duration _premiumWeeklyAllowance = Duration(minutes: 15);
-  Duration _activeWeeklyAllowance = _freeWeeklyAllowance;
-  Duration? _remainingWeeklyUsage;
-  bool _usageLoading = true;
-  bool _premiumCelebrationShown = false;
-  DateTime? _nextReset;
-  static const String _subscriptionProductId = 'sensei_pro_monthly';
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
-  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
-  bool _storeAvailable = false;
-  bool _purchasePending = false;
-  bool _hasActiveSubscription = false;
-  String? _purchaseError;
-  List<ProductDetails> _availableProducts = [];
   final FriendRepository _friendRepository = FriendRepositoryImpl();
   List<FriendRequestModel> _pendingRequests = [];
   bool _requestsLoading = true;
@@ -51,122 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUsageInfo();
     _loadPendingRequests();
-    _initializeInAppPurchase();
-  }
-
-  Future<void> _loadUsageInfo() async {
-    final user = FirebaseAuth.instance.currentUser;
-    final prefs = await SharedPreferences.getInstance();
-
-    final userProvider = context.read<UserProvider>();
-    final subscriptionPlan =
-        userProvider.userPreferences?.subscriptionPlan.toLowerCase() ?? 'free';
-    final isProUser = subscriptionPlan == 'premium';
-    final planAllowance = isProUser
-        ? _premiumWeeklyAllowance
-        : _freeWeeklyAllowance;
-    final currentPlan = isProUser ? 'premium' : 'free';
-
-    Duration remaining = planAllowance;
-    DateTime nextResetUtc = _weekStart(
-      DateTime.now().toUtc(),
-    ).add(const Duration(days: 7));
-    final userId = user?.uid;
-    if (userId != null) {
-      final weekKey = 'satori_week_start_$userId';
-      final remainingKey = 'satori_week_seconds_$userId';
-      final planKey = 'satori_week_plan_$userId';
-      final storedWeek = prefs.getInt(weekKey);
-      final storedSeconds = prefs.getInt(remainingKey);
-      final storedPlan = prefs.getString(planKey);
-      final nowUtc = DateTime.now().toUtc();
-      final currentWeekStart = _weekStart(nowUtc);
-      final currentWeekEpoch = currentWeekStart.millisecondsSinceEpoch;
-
-      if (storedWeek != null) {
-        final storedWeekStart = DateTime.fromMillisecondsSinceEpoch(
-          storedWeek,
-          isUtc: true,
-        );
-        final storedNextReset = storedWeekStart.add(const Duration(days: 7));
-
-        if (storedNextReset.isBefore(nowUtc)) {
-          await prefs.setInt(weekKey, currentWeekEpoch);
-          await prefs.setInt(remainingKey, planAllowance.inSeconds);
-          await prefs.setString(planKey, currentPlan);
-          remaining = planAllowance;
-          nextResetUtc = currentWeekStart.add(const Duration(days: 7));
-        } else {
-          var effectiveSeconds = storedSeconds ?? planAllowance.inSeconds;
-          if (effectiveSeconds < 0) effectiveSeconds = 0;
-
-          final freeAllowanceSeconds = _freeWeeklyAllowance.inSeconds;
-          final premiumAllowanceSeconds = _premiumWeeklyAllowance.inSeconds;
-          final planChanged = storedPlan != null && storedPlan != currentPlan;
-
-          if (planChanged) {
-            if (currentPlan == 'premium' && storedPlan == 'free') {
-              final usedSeconds = _clampInt(
-                freeAllowanceSeconds - effectiveSeconds,
-                0,
-                freeAllowanceSeconds,
-              );
-              effectiveSeconds = _clampInt(
-                premiumAllowanceSeconds - usedSeconds,
-                0,
-                premiumAllowanceSeconds,
-              );
-            } else if (currentPlan == 'free' && storedPlan == 'premium') {
-              effectiveSeconds = _clampInt(
-                effectiveSeconds,
-                0,
-                freeAllowanceSeconds,
-              );
-            }
-          }
-
-          if (isProUser) {
-            effectiveSeconds = _clampInt(
-              effectiveSeconds,
-              0,
-              premiumAllowanceSeconds,
-            );
-          } else {
-            effectiveSeconds = _clampInt(
-              effectiveSeconds,
-              0,
-              freeAllowanceSeconds,
-            );
-          }
-
-          if (storedSeconds != null && effectiveSeconds != storedSeconds) {
-            await prefs.setInt(remainingKey, effectiveSeconds);
-          }
-          if (planChanged || storedPlan == null) {
-            await prefs.setString(planKey, currentPlan);
-          }
-
-          remaining = Duration(seconds: effectiveSeconds);
-          nextResetUtc = storedNextReset;
-        }
-      } else {
-        await prefs.setInt(weekKey, currentWeekEpoch);
-        await prefs.setInt(remainingKey, planAllowance.inSeconds);
-        await prefs.setString(planKey, currentPlan);
-        remaining = planAllowance;
-        nextResetUtc = currentWeekStart.add(const Duration(days: 7));
-      }
-    }
-
-    if (!mounted) return;
-    setState(() {
-      _remainingWeeklyUsage = remaining;
-      _activeWeeklyAllowance = planAllowance;
-      _nextReset = nextResetUtc.toLocal();
-      _usageLoading = false;
-    });
   }
 
   Future<void> _loadPendingRequests() async {
@@ -185,239 +53,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) {
         setState(() => _requestsLoading = false);
-      }
-    }
-  }
-
-  int _clampInt(int value, int min, int max) {
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
-  }
-
-  Future<void> _initializeInAppPurchase() async {
-    final bool available = await _inAppPurchase.isAvailable();
-    if (!mounted) return;
-
-    setState(() {
-      _storeAvailable = available;
-    });
-
-    if (!available) {
-      _purchaseError = 'Store unavailable. Please try again later.';
-      return;
-    }
-
-    _purchaseSubscription ??= _inAppPurchase.purchaseStream.listen(
-      _handlePurchaseUpdates,
-      onDone: () {
-        _purchaseSubscription?.cancel();
-        _purchaseSubscription = null;
-      },
-      onError: (Object error) {
-        if (!mounted) return;
-        setState(() {
-          _purchaseError = 'Purchase failed: $error';
-          _purchasePending = false;
-        });
-      },
-    );
-
-    await _loadProducts();
-    await _inAppPurchase.restorePurchases();
-  }
-
-  Future<void> _loadProducts() async {
-    final ProductDetailsResponse response = await _inAppPurchase
-        .queryProductDetails({_subscriptionProductId});
-    if (!mounted) return;
-
-    if (response.error != null) {
-      setState(() {
-        _purchaseError = response.error!.message;
-      });
-    } else {
-      setState(() {
-        _purchaseError = null;
-      });
-    }
-
-    if (response.notFoundIDs.isNotEmpty && mounted) {
-      setState(() {
-        _purchaseError =
-            'Product not found: ${response.notFoundIDs.join(', ')}';
-      });
-    }
-
-    setState(() {
-      _availableProducts = response.productDetails;
-    });
-  }
-
-  Future<void> _handlePurchaseUpdates(
-    List<PurchaseDetails> purchaseDetailsList,
-  ) async {
-    for (final PurchaseDetails purchaseDetails in purchaseDetailsList) {
-      await _processPurchaseDetails(purchaseDetails);
-    }
-  }
-
-  Future<void> _processPurchaseDetails(PurchaseDetails purchaseDetails) async {
-    switch (purchaseDetails.status) {
-      case PurchaseStatus.pending:
-        if (!mounted) return;
-        setState(() {
-          _purchasePending = true;
-          _purchaseError = null;
-          _premiumCelebrationShown = false;
-        });
-        break;
-      case PurchaseStatus.purchased:
-      case PurchaseStatus.restored:
-        final bool valid = await _verifyPurchase(purchaseDetails);
-        if (valid && mounted) {
-          final userProvider = context.read<UserProvider>();
-          final bool wasPremiumBeforeProcessing = _hasActiveSubscription ||
-              (userProvider.userPreferences?.subscriptionPlan.toLowerCase() ==
-                  'premium');
-          setState(() {
-            _hasActiveSubscription = true;
-            _purchasePending = false;
-            _purchaseError = null;
-          });
-          _showSnackBar('Subscription activated.');
-          await _updateSubscriptionPlan('premium');
-          final bool gainedPremiumWhileClosed =
-              purchaseDetails.status == PurchaseStatus.restored &&
-                  !wasPremiumBeforeProcessing;
-          if (purchaseDetails.status == PurchaseStatus.purchased ||
-              gainedPremiumWhileClosed) {
-            _triggerPremiumCelebration();
-          }
-        } else if (!valid && mounted) {
-          setState(() {
-            _purchaseError = 'Purchase verification failed.';
-            _purchasePending = false;
-          });
-          _showSnackBar('Purchase could not be verified.');
-        }
-        break;
-      case PurchaseStatus.canceled:
-        if (!mounted) return;
-        setState(() {
-          _purchasePending = false;
-          _purchaseError = 'Purchase cancelled.';
-        });
-        _showSnackBar('Purchase cancelled.');
-        break;
-      case PurchaseStatus.error:
-        if (!mounted) return;
-        setState(() {
-          _purchasePending = false;
-          _purchaseError =
-              purchaseDetails.error?.message ??
-              'An error occurred during the purchase.';
-        });
-        _showSnackBar('Purchase failed.');
-        break;
-    }
-
-    if (purchaseDetails.pendingCompletePurchase) {
-      await _inAppPurchase.completePurchase(purchaseDetails);
-    }
-  }
-
-  Future<bool> _verifyPurchase(PurchaseDetails purchaseDetails) async {
-    // TODO: Implement secure server-side receipt validation.
-    return purchaseDetails.productID == _subscriptionProductId;
-  }
-
-  Future<void> _updateSubscriptionPlan(String plan) async {
-    final userProvider = context.read<UserProvider>();
-    try {
-      await userProvider.updateSubscriptionPlan(plan);
-    } catch (e) {
-      debugPrint('Failed to update subscription plan: $e');
-    }
-  }
-
-  void _triggerPremiumCelebration() {
-    if (_premiumCelebrationShown || !mounted) return;
-    setState(() {
-      _premiumCelebrationShown = true;
-    });
-
-    Future.microtask(() {
-      if (!mounted) return;
-      showPremiumCelebrationOverlay(
-        context,
-        texts: (
-          title: 'Your journey just leveled up! 🚀',
-          subtitle: 'Enjoy premium access to Sensei, Satori, and more.',
-        ),
-      );
-    });
-  }
-
-  Future<void> _onUpgradePressed() async {
-    if (_purchasePending) return;
-
-    if (!_storeAvailable) {
-      _showSnackBar('Store not available. Please try again later.');
-      return;
-    }
-
-    if (_availableProducts.isEmpty) {
-      await _loadProducts();
-      if (_availableProducts.isEmpty) {
-        _showSnackBar('Unable to load subscription details.');
-        return;
-      }
-    }
-
-    final ProductDetails product = _availableProducts.first;
-    final PurchaseParam purchaseParam = PurchaseParam(
-      productDetails: product,
-      applicationUserName: null,
-    );
-
-    setState(() {
-      _purchasePending = true;
-      _purchaseError = null;
-    });
-
-    try {
-      await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _purchasePending = false;
-        _purchaseError = 'Unable to start purchase: $e';
-      });
-      _showSnackBar('Something went wrong. Please try again.');
-    }
-  }
-
-  Future<void> _onManagePlanPressed() async {
-    if (_purchasePending) return;
-    setState(() {
-      _purchasePending = true;
-      _purchaseError = null;
-    });
-    try {
-      await _inAppPurchase.restorePurchases();
-      _showSnackBar('Restoring purchases...');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _purchaseError = 'Could not restore purchases: $e';
-      });
-      _showSnackBar('Could not restore purchases.');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _purchasePending = false;
-        });
       }
     }
   }
@@ -444,12 +79,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final metadata = SettableMetadata(
         contentType: _contentTypeForExtension(extension),
       );
-      final ref = _storage.ref().child('profile_pictures/${user.uid}.$extension');
+      final ref =
+          _storage.ref().child('profile_pictures/${user.uid}.$extension');
       await ref.putData(picked.bytes, metadata);
       final downloadUrl = await ref.getDownloadURL();
 
       await user.updatePhotoURL(downloadUrl);
-      await context.read<UserProvider>().updatePreferences(photoUrl: downloadUrl);
+      if (!mounted) return;
+      await context
+          .read<UserProvider>()
+          .updatePreferences(photoUrl: downloadUrl);
       await _firestore.collection('users').doc(user.uid).set(
         {
           'photoUrl': downloadUrl,
@@ -486,12 +125,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       default:
         return 'image/jpeg';
     }
-  }
-
-  @override
-  void dispose() {
-    _purchaseSubscription?.cancel();
-    super.dispose();
   }
 
   Future<void> _acceptRequest(FriendRequestModel request) async {
@@ -534,25 +167,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  DateTime _weekStart(DateTime utcNow) {
-    final midnight = DateTime.utc(utcNow.year, utcNow.month, utcNow.day);
-    final daysFromMonday = (midnight.weekday - DateTime.monday) % 7;
-    return midnight.subtract(Duration(days: daysFromMonday));
-  }
-
   Future<void> _signOut(BuildContext context) async {
+    final navigator = Navigator.of(context, rootNavigator: true);
     try {
-      if (context.mounted) {
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        await userProvider.signOut();
-      }
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await PushNotificationService.instance.unregisterDevice();
       await FirebaseAuth.instance.signOut();
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (context.mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
+      await userProvider.signOut();
+      // The auth listener may unmount Profile before sign-out completes.
+      // Use the captured root navigator to remove authenticated routes safely.
+      if (navigator.mounted) {
+        navigator.pushNamedAndRemoveUntil('/', (route) => false);
       }
     } catch (e) {
       debugPrint('Sign out error: $e');
@@ -572,6 +197,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      backgroundColor: AppColors.surfaceElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => _EditProfileSheet(user: user, preferences: preferences),
     );
 
@@ -589,142 +218,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final profilePhotoUrl = (userData?.photoUrl?.isNotEmpty ?? false)
         ? userData!.photoUrl
         : (user?.photoURL?.isNotEmpty ?? false)
-        ? user!.photoURL
-        : null;
+            ? user!.photoURL
+            : null;
 
-    final plan = userData?.subscriptionPlan.toLowerCase() ?? 'free';
-    final isProUser = plan == 'premium';
-    final effectiveProStatus = isProUser || _hasActiveSubscription;
-    final premiumPrice = _availableProducts.isNotEmpty
-        ? _availableProducts.first.price
-        : '₹ 199 / month';
-
-    return Scaffold(
-      appBar: AppBar(
-        surfaceTintColor: Colors.transparent,
-        backgroundColor: Colors.orange[100],
-        elevation: 0,
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-            fontFamily: 'DancingScript',
-            fontSize: 36,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ProfileHeaderCard(
-              photoUrl: profilePhotoUrl,
-              name: userData?.name ?? user?.displayName ?? 'Sensei Learner',
-              email: userData?.email ?? user?.email ?? 'No email linked',
-              phone: userData?.phone ?? 'Add a phone number',
-              dob: userData?.dateOfBirth ?? 'Add your birthday',
-              gender: userData?.gender ?? 'Let us know how to address you',
-              onEditProfile: () => _openEditProfile(user, userData),
-              onSignOut: () => _signOut(context),
-              onChangePhoto: _changeProfilePhoto,
-              isPhotoUpdating: _updatingPhoto,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Upgrade to Premium',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            _PlanCard(
-              title: 'Free Plan',
-              subtitle: 'For casual learners',
-              features: const [
-                '2 Sensei sessions/week',
-                'Access to Dojos & assignments',
-                'Community chat',
-                'Satori (voice AI) · 5 min/week',
-              ],
-              isCurrentPlan: !isProUser,
-              accentColor: Colors.green,
-              priceLabel: 'Current Plan',
-              ctaLabel: 'Included',
-              onPressed: null,
-            ),
-            const SizedBox(height: 16),
-            _PlanCard(
-              title: 'Sensei Pro',
-              subtitle: 'Unlock your full potential',
-              features: const [
-                'Unlimited Sensei sessions',
-                'Satori (voice AI) · 15 min/week',
-                'AI Doubt Solver with voice chat',
-                'Priority chat & early access',
-                'Ad-free experience',
-              ],
-              isCurrentPlan: effectiveProStatus,
-              accentColor: Colors.purple,
-              priceLabel: premiumPrice,
-              ctaLabel: _purchasePending
-                  ? 'Processing...'
-                  : effectiveProStatus
-                  ? 'Manage Plan'
-                  : 'Upgrade Now',
-              onPressed: _purchasePending
-                  ? null
-                  : effectiveProStatus
-                  ? _onManagePlanPressed
-                  : _onUpgradePressed,
-            ),
-            if (_purchaseError != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _purchaseError!,
-                style: const TextStyle(color: Colors.redAccent),
-              ),
-            ],
-            const SizedBox(height: 32),
-            const Text(
-              'Pending Friend Requests',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            PendingRequestsCard(
-              loading: _requestsLoading,
-              requests: _pendingRequests,
-              onAccept: _acceptRequest,
-              onDecline: _declineRequest,
-            ),
-            const SizedBox(height: 32),
-            _WeeklyUsageCard(
-              isProUser: isProUser,
-              remainingDuration: _remainingWeeklyUsage,
-              usageLoading: _usageLoading,
-              totalAllowance: _activeWeeklyAllowance,
-              nextReset: _nextReset,
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Focus Tools',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            Consumer<AppLockProvider>(
-              builder: (context, appLock, _) {
-                if (appLock.isInitializing) {
-                  return const _AppLockLoadingCard();
-                }
-                if (!appLock.isSupported) {
-                  return const _AppLockUnsupportedCard();
-                }
-                unawaited(appLock.resetIfNewDay());
-                return _AppLockSettingsCard(provider: appLock);
-              },
-            ),
-          ],
-        ),
+    return ProfileView(
+      photoUrl: profilePhotoUrl,
+      name: userData?.name ?? user?.displayName ?? 'Sensei Learner',
+      email: userData?.email ?? user?.email ?? '',
+      notificationsEnabled: userData?.notificationsEnabled,
+      isPhotoUpdating: _updatingPhoto,
+      onEditProfile: () => _openEditProfile(user, userData),
+      onSignOut: () => _signOut(context),
+      onChangePhoto: _changeProfilePhoto,
+      requests: PendingRequestsCard(
+        loading: _requestsLoading,
+        requests: _pendingRequests,
+        onAccept: _acceptRequest,
+        onDecline: _declineRequest,
       ),
     );
   }
@@ -771,9 +281,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         !_genderOptions.contains(prefGender)) {
       _genderOptions.insert(0, prefGender);
     }
-    _selectedGender = prefGender != null && prefGender.isNotEmpty
-        ? prefGender
-        : null;
+    _selectedGender =
+        prefGender != null && prefGender.isNotEmpty ? prefGender : null;
   }
 
   @override
@@ -809,9 +318,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   ),
                 ),
                 IconButton(
-                  onPressed: _saving
-                      ? null
-                      : () => Navigator.of(context).pop(false),
+                  tooltip: 'Close edit profile',
+                  onPressed:
+                      _saving ? null : () => Navigator.of(context).pop(false),
                   icon: const Icon(Icons.close),
                 ),
               ],
@@ -858,11 +367,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _selectedGender,
               items: _genderOptions
                   .map(
-                    (gender) =>
-                        DropdownMenuItem(value: gender, child: Text(gender)),
+                    (gender) => DropdownMenuItem(
+                        value: gender,
+                        child: Text(gender, overflow: TextOverflow.ellipsis)),
                   )
                   .toList(),
               onChanged: _saving
@@ -873,24 +384,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               decoration: const InputDecoration(labelText: 'Gender'),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
+            SenseiPrimaryButton(
               onPressed: _saving ? null : _saveProfile,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text('Save Changes'),
+              isLoading: _saving,
+              text: 'Save changes',
             ),
           ],
         ),
@@ -903,8 +400,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     final now = DateTime.now();
     final initialDate = _selectedDate != null
         ? _selectedDate!.isAfter(now)
-              ? now
-              : _selectedDate!
+            ? now
+            : _selectedDate!
         : DateTime(now.year - 16, now.month, now.day);
     final picked = await showDatePicker(
       context: context,
@@ -912,7 +409,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       firstDate: DateTime(1900),
       lastDate: now,
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _selectedDate = picked;
         _dobController.text = _formatDate(picked);
@@ -962,746 +459,5 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     final month = date.month.toString().padLeft(2, '0');
     final day = date.day.toString().padLeft(2, '0');
     return '${date.year}-$month-$day';
-  }
-}
-
-class _ProfileHeaderCard extends StatelessWidget {
-  final String? photoUrl;
-  final String name;
-  final String email;
-  final String phone;
-  final String dob;
-  final String gender;
-  final VoidCallback onEditProfile;
-  final VoidCallback onSignOut;
-  final VoidCallback onChangePhoto;
-  final bool isPhotoUpdating;
-
-  const _ProfileHeaderCard({
-    required this.photoUrl,
-    required this.name,
-    required this.email,
-    required this.phone,
-    required this.dob,
-    required this.gender,
-    required this.onEditProfile,
-    required this.onSignOut,
-    required this.onChangePhoto,
-    required this.isPhotoUpdating,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              _ProfileAvatar(photoUrl: photoUrl),
-              Positioned(
-                bottom: 4,
-                right: 8,
-                child: Material(
-                  shape: const CircleBorder(),
-                  color: Colors.white,
-                  child: IconButton(
-                    tooltip: 'Update photo',
-                    onPressed: isPhotoUpdating ? null : onChangePhoto,
-                    iconSize: 20,
-                    constraints: const BoxConstraints(
-                      minHeight: 36,
-                      minWidth: 36,
-                    ),
-                    icon: isPhotoUpdating
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.camera_alt_outlined, size: 18),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            name,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            email,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _DetailRow(icon: Icons.person, value: name),
-          _DetailRow(icon: Icons.email_outlined, value: email),
-          _DetailRow(icon: Icons.phone_outlined, value: phone),
-          _DetailRow(icon: Icons.cake_outlined, value: dob),
-          _DetailRow(icon: Icons.wc_outlined, value: gender),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: onEditProfile,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28),
-                ),
-              ),
-              child: const Text('Edit Profile'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: onSignOut,
-            child: const Text(
-              'Sign Out',
-              style: TextStyle(
-                color: Colors.redAccent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  final String? photoUrl;
-
-  const _ProfileAvatar({required this.photoUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = [Colors.purpleAccent, Colors.blueAccent, Colors.cyanAccent];
-
-    return Container(
-      width: 110,
-      height: 110,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(colors: colors),
-      ),
-      child: Container(
-        margin: const EdgeInsets.all(6),
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-        ),
-        child: ClipOval(
-          child: photoUrl != null
-              ? Image.network(photoUrl!, fit: BoxFit.cover)
-              : const Icon(
-                  Icons.person_outline,
-                  size: 56,
-                  color: Colors.deepPurple,
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final IconData icon;
-  final String value;
-
-  const _DetailRow({required this.icon, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: theme.colorScheme.primary.withValues(alpha: 0.7),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlanCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final List<String> features;
-  final bool isCurrentPlan;
-  final Color accentColor;
-  final String priceLabel;
-  final String ctaLabel;
-  final VoidCallback? onPressed;
-
-  const _PlanCard({
-    required this.title,
-    required this.subtitle,
-    required this.features,
-    required this.isCurrentPlan,
-    required this.accentColor,
-    required this.priceLabel,
-    required this.ctaLabel,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: accentColor.withValues(alpha: isCurrentPlan ? 0.4 : 0.2),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Text(
-                  priceLabel,
-                  style: TextStyle(
-                    color: accentColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ...features.map(
-            (feature) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, size: 18, color: accentColor),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(feature, style: theme.textTheme.bodyMedium),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: isCurrentPlan ? null : onPressed,
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: accentColor.withValues(
-                  alpha: isCurrentPlan ? 0.35 : 1.0,
-                ),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-              child: Text(
-                isCurrentPlan ? 'Current Plan' : ctaLabel,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeeklyUsageCard extends StatelessWidget {
-  final bool isProUser;
-  final Duration? remainingDuration;
-  final Duration totalAllowance;
-  final bool usageLoading;
-  final DateTime? nextReset;
-
-  const _WeeklyUsageCard({
-    required this.isProUser,
-    required this.remainingDuration,
-    required this.totalAllowance,
-    required this.usageLoading,
-    required this.nextReset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final allowanceSeconds = totalAllowance.inSeconds;
-    final remainingSeconds =
-        remainingDuration?.inSeconds ?? totalAllowance.inSeconds;
-    var usedSeconds = allowanceSeconds - remainingSeconds;
-    if (usedSeconds < 0) usedSeconds = 0;
-    if (usedSeconds > allowanceSeconds) usedSeconds = allowanceSeconds;
-    final usageFraction = allowanceSeconds == 0
-        ? 0.0
-        : usedSeconds / allowanceSeconds;
-    final normalizedUsage = usageFraction.clamp(0.0, 1.0).toDouble();
-    final usedDuration = Duration(seconds: usedSeconds);
-
-    String usageLabel;
-    if (usageLoading) {
-      usageLabel = 'Loading…';
-    } else if (remainingDuration == null) {
-      usageLabel =
-          '${_formatDurationShort(usedDuration)} used · ${_formatDurationShort(totalAllowance)} weekly';
-    } else {
-      usageLabel =
-          '${_formatDurationShort(remainingDuration!)} left · ${_formatDurationShort(totalAllowance)} weekly';
-    }
-    final localizations = MaterialLocalizations.of(context);
-    final countdownText = _buildCountdownText(nextReset);
-    final scheduleText = _buildScheduleText(nextReset, localizations);
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text.rich(
-            TextSpan(
-              text: 'Weekly Usage',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-              children: const [
-                TextSpan(
-                  text: ' · Satori',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Allowance',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              Text(
-                usageLabel,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          if (!isProUser) ...[
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: LinearProgressIndicator(
-                minHeight: 10,
-                value: usageLoading ? null : normalizedUsage,
-                backgroundColor: theme.colorScheme.primaryContainer.withValues(
-                  alpha: 0.3,
-                ),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  theme.colorScheme.primary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          Text(
-            countdownText,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            scheduleText,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Usage resets automatically every Monday.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _buildCountdownText(DateTime? nextReset) {
-    if (nextReset == null) {
-      return 'Reset schedule unavailable';
-    }
-    final diff = nextReset.difference(DateTime.now());
-    if (diff.isNegative) {
-      return 'Resets shortly';
-    }
-    final days = diff.inDays;
-    final hours = diff.inHours % 24;
-    final minutes = diff.inMinutes % 60;
-    final parts = <String>[];
-    if (days > 0) {
-      parts.add('$days day${days == 1 ? '' : 's'}');
-    }
-    if (hours > 0) {
-      parts.add('$hours hr${hours == 1 ? '' : 's'}');
-    }
-    if (minutes > 0 || parts.isEmpty) {
-      parts.add('$minutes min${minutes == 1 ? '' : 's'}');
-    }
-    return 'Resets in ${parts.join(' ')}';
-  }
-
-  String _buildScheduleText(
-    DateTime? nextReset,
-    MaterialLocalizations localizations,
-  ) {
-    if (nextReset == null) {
-      return 'Next reset time unavailable';
-    }
-    final date = localizations.formatFullDate(nextReset);
-    final time = localizations.formatTimeOfDay(
-      TimeOfDay.fromDateTime(nextReset),
-      alwaysUse24HourFormat: false,
-    );
-    return 'Next reset on $date at $time';
-  }
-
-  String _formatDurationShort(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
-  }
-}
-
-class _AppLockLoadingCard extends StatelessWidget {
-  const _AppLockLoadingCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: const [
-          CircularProgressIndicator(strokeWidth: 2.5),
-          SizedBox(width: 16),
-          Expanded(
-            child: Text('Preparing App Lock Mode...'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AppLockUnsupportedCard extends StatelessWidget {
-  const _AppLockUnsupportedCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text('App Lock Mode is only available on Android devices.'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AppLockSettingsCard extends StatelessWidget {
-  final AppLockProvider provider;
-
-  const _AppLockSettingsCard({required this.provider});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final statusText = provider.hasCompletedToday ? 'Completed' : 'Still pending';
-    final statusColor = provider.hasCompletedToday ? Colors.green : Colors.deepOrange;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'App Lock Mode',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Block Instagram, YouTube, Netflix, and other entertainment apps until today\'s Study Session is marked done.',
-                      style: TextStyle(height: 1.4),
-                    ),
-                  ],
-                ),
-              ),
-              Switch.adaptive(
-                value: provider.isEnabled,
-                onChanged: provider.isInitializing
-                    ? null
-                    : (value) => provider.toggleAppLock(context, value),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _PermissionStatusRow(
-            label: 'Usage access',
-            granted: provider.hasUsagePermission,
-          ),
-          const SizedBox(height: 8),
-          _PermissionStatusRow(
-            label: 'Draw over apps',
-            granted: provider.hasOverlayPermission,
-          ),
-          if (provider.shouldShowPermissionWarning) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const Text(
-                'Grant both permissions to keep entertainment apps blocked until you finish studying.',
-                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.deepOrange),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.event_available, color: statusColor),
-              const SizedBox(width: 8),
-              const Text('Today\'s Study Session: '),
-              Text(
-                statusText,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: statusColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Minimum study session',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${provider.minimumSessionMinutes} minutes',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                    ),
-                    Slider(
-                      min: 5,
-                      max: 180,
-                      divisions: 35,
-                      label: '${provider.minimumSessionMinutes} min',
-                      value: provider.minimumSessionMinutes.toDouble(),
-                      onChanged: (value) {
-                        final minutes = value.round();
-                        unawaited(provider.setMinimumSessionMinutes(minutes));
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => unawaited(provider.ensurePermissions(context)),
-                icon: const Icon(Icons.shield_outlined),
-                label: const Text('Manage permissions'),
-              ),
-              TextButton.icon(
-                onPressed: () => unawaited(provider.refreshPermissions()),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh status'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PermissionStatusRow extends StatelessWidget {
-  final String label;
-  final bool granted;
-
-  const _PermissionStatusRow({required this.label, required this.granted});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = granted ? Colors.green : Colors.redAccent;
-    final icon = granted ? Icons.check_circle : Icons.error_outline;
-    final status = granted ? 'Granted' : 'Required';
-
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label)),
-        Text(
-          status,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ],
-    );
   }
 }

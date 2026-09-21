@@ -79,7 +79,9 @@ class AppLockProvider extends ChangeNotifier {
   Future<void> toggleAppLock(BuildContext context, bool value) async {
     if (!isSupported) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('App Lock Mode is only supported on Android devices.')),
+        const SnackBar(
+            content:
+                Text('App Lock Mode is only supported on Android devices.')),
       );
       return;
     }
@@ -199,7 +201,8 @@ class AppLockProvider extends ChangeNotifier {
   Future<void> resetIfNewDay() async {
     if (!isSupported) return;
     final todayKey = _todayKey();
-    final shouldReset = _storedCompletionDay != null && _storedCompletionDay != todayKey;
+    final shouldReset =
+        _storedCompletionDay != null && _storedCompletionDay != todayKey;
     if (shouldReset) {
       _storedCompletionDay = null;
       if (_hasCompletedToday) {
@@ -262,7 +265,8 @@ class AppLockProvider extends ChangeNotifier {
       final result = await _channel.invokeMethod<T>(method, arguments);
       return result;
     } on PlatformException catch (error) {
-      debugPrint('AppLockProvider: $method failed: ${error.message ?? error.code}');
+      debugPrint(
+          'AppLockProvider: $method failed: ${error.message ?? error.code}');
     } on MissingPluginException catch (error) {
       debugPrint('AppLockProvider missing plugin: $error');
     }

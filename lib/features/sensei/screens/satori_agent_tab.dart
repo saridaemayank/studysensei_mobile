@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/livekit_credentials.dart';
 import '../services/backend_service.dart';
@@ -12,14 +13,12 @@ class SatoriAgentTab extends StatefulWidget {
   final BackendService backendService;
   final String subject;
   final String concept;
-  final bool isProUser;
 
   const SatoriAgentTab({
     super.key,
     required this.backendService,
     required this.subject,
     required this.concept,
-    this.isProUser = false,
   });
 
   @override
@@ -37,34 +36,22 @@ enum _ConnectionStatus {
 
 class _SatoriAgentTabState extends State<SatoriAgentTab>
     with SingleTickerProviderStateMixin {
-  static const Duration _freeWeeklyAllowance = Duration(minutes: 5);
-  static const Duration _proWeeklyAllowance = Duration(minutes: 15);
   static const Color _idleAccent = Color(0xFF7B3FF3);
 
   late lk.Room _room;
   lk.EventsListener<lk.RoomEvent>? _roomEvents;
   late final AnimationController _pulseController;
-  SharedPreferences? _prefs;
 
   lk.RemoteParticipant? _agentParticipant;
+  LiveKitCredentials? _activeCredentials;
   _ConnectionStatus _status = _ConnectionStatus.idle;
   String _agentState = 'offline';
   String? _errorMessage;
   bool _micEnabled = true;
 
-  Timer? _sessionTimer;
-  Duration? _remainingDuration;
-  bool _timerInitialized = false;
-  DateTime? _currentWeekStartUtc;
   bool _isResettingRoom = false;
-
-  Duration get _weeklyAllowance =>
-      widget.isProUser ? _proWeeklyAllowance : _freeWeeklyAllowance;
-
-  String? get _userId => widget.backendService.user?.uid;
-  String _weekKey(String uid) => 'satori_week_start_$uid';
-  String _remainingKey(String uid) => 'satori_week_seconds_$uid';
-  String _planKey(String uid) => 'satori_week_plan_$uid';
+  bool _kickoffSent = false;
+  bool _audioPlaybackStarted = false;
 
   @override
   void initState() {
@@ -75,20 +62,29 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
     );
     _room = _createRoom();
     _attachRoomEvents();
-    Future.microtask(_initializeTimerState);
     _refreshPulseAnimation();
   }
 
   @override
   void dispose() {
-    _sessionTimer?.cancel();
     _roomEvents?.dispose();
     _pulseController.dispose();
     unawaited(_room.dispose());
+    unawaited(_cancelActiveDispatch(fireAndForget: true));
+    _kickoffSent = false;
     super.dispose();
   }
 
   Future<void> _connectToAgent() async {
+    final hasMicPermission = await _ensureMicrophonePermission();
+    if (!hasMicPermission) {
+      _updateStatus(
+        _ConnectionStatus.error,
+        message: 'Microphone access is required to talk to Satori.',
+      );
+      return;
+    }
+
     await _waitForRoomReady();
     if (_status == _ConnectionStatus.fetchingCredentials ||
         _status == _ConnectionStatus.connecting ||
@@ -96,20 +92,8 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
       return;
     }
 
-    await _initializeTimerState(forceReload: true);
-    _remainingDuration ??= _weeklyAllowance;
-    if ((_remainingDuration?.inSeconds ?? 0) <= 0) {
-      _updateStatus(
-        _ConnectionStatus.error,
-        message: widget.isProUser
-            ? 'You have used your weekly Satori time allocation.'
-            : 'You have used all of your free Satori time for this week.',
-      );
-      await _showUsageLimitDialog(isProUser: widget.isProUser);
-      return;
-    }
-
     _updateStatus(_ConnectionStatus.fetchingCredentials);
+    _kickoffSent = false;
 
     try {
       final roomName =
@@ -122,6 +106,15 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
         roomName: roomName,
       );
 
+      if (!mounted) {
+        unawaited(widget.backendService.cancelSatoriDispatch(credentials));
+        return;
+      }
+
+      setState(() {
+        _activeCredentials = credentials;
+      });
+
       _updateStatus(_ConnectionStatus.connecting);
 
       await _room.connect(
@@ -131,6 +124,7 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
 
       await _room.localParticipant?.setMicrophoneEnabled(true);
       await _room.localParticipant?.setCameraEnabled(false);
+      await _ensureAudioPlayback();
 
       if (!mounted) return;
       setState(() {
@@ -144,6 +138,7 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
         _ConnectionStatus.error,
         message: e.toString(),
       );
+      await _cancelActiveDispatch(fireAndForget: true);
     }
   }
 
@@ -156,6 +151,7 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
       await _room.disconnect();
       await _resetRoom();
     } finally {
+      await _cancelActiveDispatch();
       if (mounted) {
         setState(() {
           _agentParticipant = null;
@@ -197,6 +193,7 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
         _agentState = 'offline';
       });
       unawaited(_resetRoom());
+      unawaited(_cancelActiveDispatch());
       _updateStatus(_ConnectionStatus.idle);
       return;
     }
@@ -208,6 +205,7 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
         _agentState =
             event.participant.attributes['lk.agent.state'] ?? 'listening';
       });
+      unawaited(_sendKickoffPrompt(event.participant));
       return;
     }
 
@@ -217,7 +215,9 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
         _agentParticipant = null;
         _agentState = 'offline';
       });
+      unawaited(_cancelActiveDispatch());
       _updateStatus(_ConnectionStatus.idle);
+      _kickoffSent = false;
       return;
     }
 
@@ -246,14 +246,6 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
         _micEnabled = true;
       }
     });
-    if (newStatus == _ConnectionStatus.connected) {
-      _startSessionTimer();
-    } else {
-      _sessionTimer?.cancel();
-    }
-    if (_timerInitialized && _remainingDuration != null) {
-      unawaited(_persistWeeklyUsage(_remainingDuration!));
-    }
     _refreshPulseAnimation();
   }
 
@@ -276,6 +268,91 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
       }
       _pulseController.value = 0;
     }
+  }
+
+  Future<void> _cancelActiveDispatch({bool fireAndForget = false}) async {
+    final credentials = _activeCredentials;
+    if (credentials == null) return;
+    _activeCredentials = null;
+
+    Future<void> cancel() =>
+        widget.backendService.cancelSatoriDispatch(credentials);
+
+    if (fireAndForget) {
+      unawaited(cancel());
+    } else {
+      await cancel();
+    }
+  }
+
+  Future<void> _ensureAudioPlayback() async {
+    if (_audioPlaybackStarted) return;
+    try {
+      await _room.startAudio();
+      await _room.setSpeakerOn(true);
+      _audioPlaybackStarted = true;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text('Unable to start audio playback: $e')),
+      );
+    }
+  }
+
+  Future<bool> _ensureMicrophonePermission() async {
+    final status = await Permission.microphone.status;
+    if (status.isGranted) return true;
+
+    final result = await Permission.microphone.request();
+    if (result.isGranted) return true;
+
+    if (!mounted) return false;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (result.isPermanentlyDenied) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Microphone access is blocked. Enable it in system settings to chat with Satori.',
+          ),
+          action: SnackBarAction(
+            label: 'Settings',
+            onPressed: openAppSettings,
+          ),
+        ),
+      );
+    } else {
+      messenger?.showSnackBar(
+        const SnackBar(
+          content: Text('Microphone permission is required to talk to Satori.'),
+        ),
+      );
+    }
+    return false;
+  }
+
+  Future<void> _sendKickoffPrompt(lk.RemoteParticipant participant) async {
+    if (_kickoffSent) return;
+    final localParticipant = _room.localParticipant;
+    if (localParticipant == null) return;
+
+    final payload = jsonEncode({
+      'type': 'instruction',
+      'variant': 'kickoff',
+      'message':
+          'You are Satori, a friendly doubt-solving tutor. Begin the session '
+              'without waiting for the student. Introduce yourself and invite '
+              'them to discuss ${widget.concept} in ${widget.subject}. Keep it concise.',
+    });
+
+    try {
+      await localParticipant.publishData(
+        utf8.encode(payload),
+        reliable: true,
+        topic: 'sensei.kickoff',
+        destinationIdentities: [participant.identity],
+      );
+      _kickoffSent = true;
+    } catch (_) {}
   }
 
   lk.Room _createRoom() {
@@ -370,208 +447,6 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
     }
   }
 
-  void _startSessionTimer() {
-    if (!_timerInitialized) return;
-
-    _sessionTimer?.cancel();
-    _remainingDuration ??= _weeklyAllowance;
-
-    if (_remainingDuration!.inSeconds <= 0) {
-      unawaited(_persistWeeklyUsage(Duration.zero));
-      _handleSessionExpired();
-      return;
-    }
-
-    unawaited(_persistWeeklyUsage(_remainingDuration!));
-
-    _sessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_remainingDuration == null) {
-        timer.cancel();
-        return;
-      }
-      if (_remainingDuration!.inSeconds <= 1) {
-        timer.cancel();
-        setState(() => _remainingDuration = Duration.zero);
-        unawaited(_persistWeeklyUsage(Duration.zero));
-        _handleSessionExpired();
-      } else {
-        setState(
-          () => _remainingDuration =
-              _remainingDuration! - const Duration(seconds: 1),
-        );
-        unawaited(_persistWeeklyUsage(_remainingDuration!));
-      }
-    });
-  }
-
-  Future<void> _handleSessionExpired() async {
-    await _disconnect();
-    if (!mounted) return;
-    await _showUsageLimitDialog(isProUser: widget.isProUser);
-  }
-
-  Future<void> _initializeTimerState({bool forceReload = false}) async {
-    if (_timerInitialized && !forceReload) {
-      return;
-    }
-
-    final uid = _userId;
-    if (uid == null) {
-      setState(() {
-        _remainingDuration = _weeklyAllowance;
-        _timerInitialized = true;
-      });
-      return;
-    }
-
-    _prefs ??= await SharedPreferences.getInstance();
-    final nowUtc = DateTime.now().toUtc();
-    final weekStart = _weekStart(nowUtc);
-    _currentWeekStartUtc = weekStart;
-
-    final storedWeekMs = _prefs!.getInt(_weekKey(uid));
-
-    final storedRemaining = _prefs!.getInt(_remainingKey(uid));
-    final storedPlan = _prefs!.getString(_planKey(uid));
-    final currentPlan = widget.isProUser ? 'premium' : 'free';
-    final freeAllowanceSeconds = _freeWeeklyAllowance.inSeconds;
-    final premiumAllowanceSeconds = _proWeeklyAllowance.inSeconds;
-
-    if (storedWeekMs == null ||
-        storedRemaining == null ||
-        storedWeekMs < weekStart.millisecondsSinceEpoch) {
-      _remainingDuration = _weeklyAllowance;
-      await _persistWeeklyUsage(_remainingDuration!);
-      await _prefs!.setString(_planKey(uid), currentPlan);
-    } else {
-      var effectiveSeconds = storedRemaining < 0 ? 0 : storedRemaining;
-      final previousSeconds = effectiveSeconds;
-      final planChanged = storedPlan != null && storedPlan != currentPlan;
-
-      if (planChanged) {
-        if (currentPlan == 'premium' && storedPlan == 'free') {
-          final usedSeconds = _clampInt(
-            freeAllowanceSeconds - effectiveSeconds,
-            0,
-            freeAllowanceSeconds,
-          );
-          effectiveSeconds = _clampInt(
-            premiumAllowanceSeconds - usedSeconds,
-            0,
-            premiumAllowanceSeconds,
-          );
-        } else if (currentPlan == 'free' && storedPlan == 'premium') {
-          effectiveSeconds =
-              _clampInt(effectiveSeconds, 0, freeAllowanceSeconds);
-        }
-      }
-
-      if (widget.isProUser) {
-        effectiveSeconds =
-            _clampInt(effectiveSeconds, 0, premiumAllowanceSeconds);
-      } else {
-        effectiveSeconds = _clampInt(effectiveSeconds, 0, freeAllowanceSeconds);
-      }
-
-      if (effectiveSeconds != previousSeconds || planChanged) {
-        await _persistWeeklyUsage(Duration(seconds: effectiveSeconds));
-      }
-
-      _remainingDuration = Duration(seconds: effectiveSeconds);
-      if (planChanged || storedPlan == null) {
-        await _prefs!.setString(_planKey(uid), currentPlan);
-      }
-    }
-
-    setState(() {
-      _timerInitialized = true;
-    });
-  }
-
-  Future<void> _persistWeeklyUsage(Duration remaining) async {
-    final uid = _userId;
-    if (uid == null) return;
-
-    _prefs ??= await SharedPreferences.getInstance();
-    final weekStart =
-        _currentWeekStartUtc ?? _weekStart(DateTime.now().toUtc());
-    _currentWeekStartUtc = weekStart;
-
-    final cappedSeconds = math.max(
-      0,
-      math.min(
-        remaining.inSeconds,
-        _weeklyAllowance.inSeconds,
-      ),
-    );
-
-    await _prefs!.setInt(
-      _weekKey(uid),
-      weekStart.millisecondsSinceEpoch,
-    );
-    await _prefs!.setInt(
-      _remainingKey(uid),
-      cappedSeconds,
-    );
-    await _prefs!.setString(
-      _planKey(uid),
-      widget.isProUser ? 'premium' : 'free',
-    );
-  }
-
-  int _clampInt(int value, int min, int max) {
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
-  }
-
-  DateTime _weekStart(DateTime utcNow) {
-    final midnight = DateTime.utc(utcNow.year, utcNow.month, utcNow.day);
-    final daysFromMonday = (midnight.weekday - DateTime.monday) % 7;
-    return midnight.subtract(Duration(days: daysFromMonday));
-  }
-
-  Future<void> _showUsageLimitDialog({required bool isProUser}) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Weekly limit reached'),
-        content: Text(
-          isProUser
-              ? 'You have reached your 15-minute weekly Satori allowance. It resets every Monday.'
-              : 'You have used all of your free Satori time for this week. Upgrade to Study Sensei Pro to unlock 15 minutes weekly.',
-        ),
-        actions: isProUser
-            ? [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Okay'),
-                ),
-              ]
-            : [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Maybe later'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final navigator =
-                        Navigator.of(context, rootNavigator: true);
-                    navigator.pop();
-                    navigator.pushNamed('/profile');
-                  },
-                  child: const Text('Explore Pro'),
-                ),
-              ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -581,7 +456,6 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
         _status == _ConnectionStatus.disconnecting;
     final isActive =
         _status != _ConnectionStatus.idle && _status != _ConnectionStatus.error;
-    final timerDuration = _timerInitialized ? _remainingDuration : null;
 
     return Center(
       child: AnimatedBuilder(
@@ -612,12 +486,6 @@ class _SatoriAgentTabState extends State<SatoriAgentTab>
                       showError: _status == _ConnectionStatus.error,
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                _TimerBadge(
-                  isPro: widget.isProUser,
-                  duration: timerDuration,
-                  defaultDuration: _weeklyAllowance,
                 ),
                 if (_status == _ConnectionStatus.error &&
                     (_errorMessage?.isNotEmpty ?? false))
@@ -935,60 +803,5 @@ class _PulseDots extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _TimerBadge extends StatelessWidget {
-  final bool isPro;
-  final Duration? duration;
-  final Duration? defaultDuration;
-
-  const _TimerBadge({
-    required this.isPro,
-    required this.duration,
-    required this.defaultDuration,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final displayDuration = duration ?? defaultDuration;
-
-    final label = displayDuration == null
-        ? 'Calculating…'
-        : '${isPro ? 'Premium' : 'Free'} · ${_formatDuration(displayDuration)} left this week';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.timer_outlined, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: theme.textTheme.titleMedium,
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
   }
 }

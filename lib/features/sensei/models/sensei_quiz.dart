@@ -88,6 +88,7 @@ class QuizStatistics {
     this.totalStudyTime = Duration.zero,
   });
 
-  double get accuracy => totalQuestions > 0 ? correctAnswers / totalQuestions : 0;
+  double get accuracy =>
+      totalQuestions > 0 ? correctAnswers / totalQuestions : 0;
   String get formattedAccuracy => '${(accuracy * 100).toStringAsFixed(1)}%';
 }

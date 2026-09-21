@@ -26,7 +26,6 @@ class UserPreferences {
   final String? preferredTheme;
   final bool? notificationsEnabled;
   final String? photoUrl;
-  final String subscriptionPlan;
   final bool phoneVerified;
   final String? phoneVerifiedAt;
 
@@ -41,7 +40,6 @@ class UserPreferences {
     this.preferredTheme = 'system',
     this.notificationsEnabled = true,
     this.photoUrl,
-    this.subscriptionPlan = 'free',
     this.phoneVerified = false,
     this.phoneVerifiedAt,
   });
@@ -60,7 +58,6 @@ class UserPreferences {
       'notificationsEnabled': notificationsEnabled,
       'updatedAt': DateTime.now().toIso8601String(),
       'photoUrl': photoUrl,
-      'subscriptionPlan': subscriptionPlan,
       'phoneVerified': phoneVerified,
       'phoneVerifiedAt': phoneVerifiedAt,
     };
@@ -79,17 +76,13 @@ class UserPreferences {
     final dateOfBirth = map['dateOfBirth'] ?? map['dob'] ?? map['birthDate'];
     final gender = map['gender'] ?? '';
     final photoUrl = map['photoUrl'] ?? map['photoURL'] ?? map['avatarUrl'];
-    final subscriptionPlan = map['subscriptionPlan'] ??
-        map['plan'] ??
-        map['planTier'] ??
-        map['membership'] ??
-        'free';
     final phoneVerified = map['phoneVerified'] == true;
     final rawVerifiedAt = map['phoneVerifiedAt'];
     String? phoneVerifiedAt;
     if (rawVerifiedAt != null) {
-      phoneVerifiedAt =
-          rawVerifiedAt is Timestamp ? rawVerifiedAt.toDate().toIso8601String() : rawVerifiedAt.toString();
+      phoneVerifiedAt = rawVerifiedAt is Timestamp
+          ? rawVerifiedAt.toDate().toIso8601String()
+          : rawVerifiedAt.toString();
     }
 
     return UserPreferences(
@@ -103,7 +96,6 @@ class UserPreferences {
       preferredTheme: map['preferredTheme']?.toString() ?? 'system',
       notificationsEnabled: map['notificationsEnabled'] ?? true,
       photoUrl: photoUrl?.toString(),
-      subscriptionPlan: subscriptionPlan.toString(),
       phoneVerified: phoneVerified,
       phoneVerifiedAt: phoneVerifiedAt,
     );
@@ -120,7 +112,6 @@ class UserPreferences {
     String? preferredTheme,
     bool? notificationsEnabled,
     String? photoUrl,
-    String? subscriptionPlan,
     bool? phoneVerified,
     String? phoneVerifiedAt,
   }) {
@@ -135,7 +126,6 @@ class UserPreferences {
       preferredTheme: preferredTheme ?? this.preferredTheme,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       photoUrl: photoUrl ?? this.photoUrl,
-      subscriptionPlan: subscriptionPlan ?? this.subscriptionPlan,
       phoneVerified: phoneVerified ?? this.phoneVerified,
       phoneVerifiedAt: phoneVerifiedAt ?? this.phoneVerifiedAt,
     );

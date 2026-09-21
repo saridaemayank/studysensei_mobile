@@ -77,7 +77,8 @@ class WeeklyCalendarStrip extends StatelessWidget {
             markerBuilder: (context, day, events) {
               final assignments = assignmentCountForDay(day).clamp(0, 3);
               final milestones = milestoneCountForDay(day).clamp(0, 3);
-              if (assignments == 0 && milestones == 0) return const SizedBox.shrink();
+              if (assignments == 0 && milestones == 0)
+                return const SizedBox.shrink();
               return Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(

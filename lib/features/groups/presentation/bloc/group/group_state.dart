@@ -35,7 +35,8 @@ class GroupState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [status, groups, selectedGroup, error, searchResults];
+  List<Object?> get props =>
+      [status, groups, selectedGroup, error, searchResults];
 
   bool get isLoading => status == GroupStatus.loading;
   bool get isSuccess => status == GroupStatus.success;
@@ -142,13 +143,14 @@ class GroupFailure extends GroupState {
         );
 
   @override
-  List<Object?> get props => [errorMessage, groups, selectedGroup, searchResults];
+  List<Object?> get props =>
+      [errorMessage, groups, selectedGroup, searchResults];
 }
 
 // Search states
 class GroupSearchResults extends GroupState {
   final String query;
-  
+
   const GroupSearchResults({
     required this.query,
     required List<Group> results,
@@ -160,7 +162,7 @@ class GroupSearchResults extends GroupState {
           groups: groups,
           selectedGroup: selectedGroup,
         );
-        
+
   @override
   List<Object?> get props => [query, groups, selectedGroup, searchResults];
 }

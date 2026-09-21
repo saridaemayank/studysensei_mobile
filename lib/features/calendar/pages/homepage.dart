@@ -3,16 +3,17 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../services/add_assignment.dart';
 
 class AssignmentPage extends StatefulWidget {
-  const AssignmentPage({Key? key}) : super(key: key);
+  const AssignmentPage({super.key});
 
   @override
-  _AssignmentPageState createState() => _AssignmentPageState();
+  State<AssignmentPage> createState() => _AssignmentPageState();
 }
 
 class _AssignmentPageState extends State<AssignmentPage> {
@@ -33,16 +34,9 @@ class _AssignmentPageState extends State<AssignmentPage> {
 
   // Predefined colors for subjects
   final List<Color> _availableColors = [
-    Colors.red,
-    Colors.green,
-    Colors.blue,
-    Colors.orange,
-    Colors.purple,
-    Colors.teal,
-    Colors.pink,
-    Colors.amber,
-    Colors.cyan,
-    Colors.indigo,
+    AppColors.primary,
+    AppColors.info,
+    AppColors.primaryLight,
   ];
 
   @override
@@ -195,7 +189,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
           _allAssignments.add(assignment);
           _events[date] = [..._events[date] ?? [], assignment];
         } catch (e) {
-          print('Error processing assignment ${doc.id}: $e');
+          debugPrint('Assignment update unavailable.');
         }
       }
 
@@ -223,7 +217,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
   }
 
   Color _getSubjectColor(String subject) {
-    return subjectColors[subject] ?? Colors.grey;
+    return subjectColors[subject] ?? AppColors.textSecondary;
   }
 
   // Function to check and delete past assignments
@@ -275,17 +269,19 @@ class _AssignmentPageState extends State<AssignmentPage> {
                 'Cleaned up ${assignmentsToDelete.length} completed assignment${assignmentsToDelete.length > 1 ? 's' : ''} past due',
               ),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.blue,
+              backgroundColor: AppColors.info,
             ),
           );
         }
       }
     } catch (e) {
-      print('Error cleaning up past assignments: $e');
+      debugPrint('Assignment update unavailable.');
     }
   }
 
   // Function to toggle assignment completion status
+  // Retained legacy handler; this presentation pass does not add actions.
+  // ignore: unused_element
   Future<void> _toggleAssignmentCompletion(
     Map<String, dynamic> assignment,
   ) async {
@@ -313,18 +309,18 @@ class _AssignmentPageState extends State<AssignmentPage> {
                   : 'Assignment marked as incomplete!',
             ),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: !currentStatus ? Colors.green : Colors.orange,
+            backgroundColor:
+                !currentStatus ? AppColors.success : AppColors.primary,
           ),
         );
       }
     } catch (e) {
-      print('Error updating assignment completion: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Error updating assignment status'),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -336,15 +332,15 @@ class _AssignmentPageState extends State<AssignmentPage> {
     return Scaffold(
       appBar: AppBar(
         surfaceTintColor: Colors.transparent,
-        backgroundColor: Colors.orange[100],
+        backgroundColor: AppColors.background,
         elevation: 0,
         title: const Text(
-          'StudySensei',
+          'Assignments',
           style: TextStyle(
-            fontFamily: 'DancingScript',
-            fontSize: 36,
+            fontFamily: 'Headings',
+            fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: AppColors.textPrimary,
           ),
         ),
         centerTitle: true,
@@ -364,7 +360,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.orange,
+        backgroundColor: AppColors.primary,
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -423,13 +419,12 @@ class _AssignmentPageState extends State<AssignmentPage> {
       );
     }
 
-    return Column(
-      children: [
-        _buildCalendar(),
-        const SizedBox(height: 8),
-        _buildAssignmentsHeader(),
-        const SizedBox(height: 8),
-        Expanded(child: _buildAssignmentList()),
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(child: _buildCalendar()),
+        SliverToBoxAdapter(child: _buildAssignmentsHeader()),
+        SliverToBoxAdapter(child: _buildAssignmentList(shrinkWrap: true)),
+        const SliverToBoxAdapter(child: SizedBox(height: 88)),
       ],
     );
   }
@@ -452,8 +447,8 @@ class _AssignmentPageState extends State<AssignmentPage> {
       elevation: 0, // Remove card elevation
       margin: const EdgeInsets.all(8.0),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: AppColors.borderSubtle, width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -485,15 +480,15 @@ class _AssignmentPageState extends State<AssignmentPage> {
           eventLoader: _getEventsForDay,
           calendarStyle: CalendarStyle(
             markerDecoration: BoxDecoration(
-              color: Colors.orange[100],
+              color: AppColors.primaryLight,
               shape: BoxShape.circle,
             ),
             todayDecoration: const BoxDecoration(
-              color: Colors.orange,
+              color: AppColors.primary,
               shape: BoxShape.circle,
             ),
             selectedDecoration: BoxDecoration(
-              color: Colors.orange[300],
+              color: AppColors.primaryLight,
               shape: BoxShape.circle,
             ),
           ),
@@ -506,12 +501,17 @@ class _AssignmentPageState extends State<AssignmentPage> {
     );
   }
 
-  Widget _buildAssignmentList() {
+  Widget _buildAssignmentList({bool shrinkWrap = false}) {
     if (_selectedDayAssignments.isEmpty) {
-      return const Center(child: Text('No assignments for selected day'));
+      return const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('No assignments for this day.',
+              textAlign: TextAlign.center));
     }
 
     return ListView.builder(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       itemCount: _selectedDayAssignments.length,
       itemBuilder: (context, index) {
@@ -522,15 +522,15 @@ class _AssignmentPageState extends State<AssignmentPage> {
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          elevation: 2,
-          color: isCompleted ? Colors.grey[100] : null,
+          elevation: 0,
+          color: isCompleted ? AppColors.surfaceElevated : null,
           child: ListTile(
             title: Text(
               assignment['name'] ?? 'No Name',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 decoration: isCompleted ? TextDecoration.lineThrough : null,
-                color: isCompleted ? Colors.grey[600] : null,
+                color: isCompleted ? AppColors.textSecondary : null,
               ),
             ),
             subtitle: Column(
@@ -541,7 +541,7 @@ class _AssignmentPageState extends State<AssignmentPage> {
                   'Subject: $subject',
                   style: TextStyle(
                     fontSize: 14,
-                    color: isCompleted ? Colors.grey[500] : null,
+                    color: isCompleted ? AppColors.textSecondary : null,
                   ),
                 ),
                 if (deadline != null) ...[
@@ -550,7 +550,9 @@ class _AssignmentPageState extends State<AssignmentPage> {
                     'Due: ${_formatDate(deadline)}',
                     style: TextStyle(
                       fontSize: 14,
-                      color: isCompleted ? Colors.grey[400] : Colors.grey,
+                      color: isCompleted
+                          ? AppColors.textSecondary
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -562,14 +564,14 @@ class _AssignmentPageState extends State<AssignmentPage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green[100],
+                      color: AppColors.success,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       'Completed',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.green[700],
+                        color: AppColors.success,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -578,12 +580,13 @@ class _AssignmentPageState extends State<AssignmentPage> {
               ],
             ),
             leading: CircleAvatar(
-              backgroundColor:
-                  isCompleted ? Colors.grey[400] : _getSubjectColor(subject),
+              backgroundColor: isCompleted
+                  ? AppColors.textSecondary
+                  : _getSubjectColor(subject),
               child: isCompleted
                   ? const Icon(Icons.check, color: Colors.white, size: 20)
                   : Text(
-                      subject[0].toUpperCase(),
+                      subject.isEmpty ? 'A' : subject[0].toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

@@ -50,10 +50,12 @@ class FriendRequestsError extends FriendRequestsState {
   List<Object> get props => [message];
 }
 
-class FriendRequestsBloc extends Bloc<FriendRequestsEvent, FriendRequestsState> {
+class FriendRequestsBloc
+    extends Bloc<FriendRequestsEvent, FriendRequestsState> {
   final FriendRepository friendRepository;
 
-  FriendRequestsBloc({required this.friendRepository}) : super(FriendRequestsLoading()) {
+  FriendRequestsBloc({required this.friendRepository})
+      : super(FriendRequestsLoading()) {
     on<LoadFriendRequests>(_onLoadFriendRequests);
     on<RespondToFriendRequest>(_onRespondToFriendRequest);
   }

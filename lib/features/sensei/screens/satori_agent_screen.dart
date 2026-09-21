@@ -68,10 +68,6 @@ class SatoriAgentScreen extends StatelessWidget {
     }
 
     final backendService = BackendService(user: user);
-    final subscriptionPlan =
-        userProvider.userPreferences?.subscriptionPlan.toLowerCase() ?? 'free';
-    final isProUser = subscriptionPlan == 'premium';
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildTabAppBar('Satori'),
@@ -80,7 +76,6 @@ class SatoriAgentScreen extends StatelessWidget {
           backendService: backendService,
           subject: _defaultSubject,
           concept: _defaultConcept,
-          isProUser: isProUser,
         ),
       ),
     );

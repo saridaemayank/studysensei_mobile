@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color primaryColor = Color(0xFFCDD8D9); // Replace with your primary color
-  static const Color secondaryColor = Color(0xFF00A36C); // Replace with your secondary color
+  static const Color primaryColor =
+      Color(0xFFCDD8D9); // Replace with your primary color
+  static const Color secondaryColor =
+      Color(0xFF00A36C); // Replace with your secondary color
   static const Color Slate = Color(0XFFC0C2C9);
   static const Color Sky = Color(0XFF87CEEB);
   static const Color Violet = Color(0XFF8F00FF);

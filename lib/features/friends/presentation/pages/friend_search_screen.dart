@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_sensei/features/friends/presentation/bloc/friend_search/friend_search_bloc.dart';
 import 'package:study_sensei/features/friends/data/repositories/friend_repository_impl.dart';
@@ -8,14 +9,14 @@ import 'package:study_sensei/features/friends/presentation/pages/friend_detail_s
 
 class FriendSearchScreen extends StatefulWidget {
   final bool showAppBar;
-  
+
   const FriendSearchScreen({
-    Key? key,
+    super.key,
     this.showAppBar = true,
-  }) : super(key: key);
+  });
 
   @override
-  _FriendSearchScreenState createState() => _FriendSearchScreenState();
+  State<FriendSearchScreen> createState() => _FriendSearchScreenState();
 }
 
 class _FriendSearchScreenState extends State<FriendSearchScreen>
@@ -52,7 +53,6 @@ class _FriendSearchScreenState extends State<FriendSearchScreen>
   }
 
   void _onSearchChanged(String query) {
-    print('Search query: $query');
     if (query.length >= 2) {
       // Only search if query is at least 2 characters
       _friendSearchBloc.add(SearchUsers(query));
@@ -64,20 +64,19 @@ class _FriendSearchScreenState extends State<FriendSearchScreen>
 
   @override
   Widget build(BuildContext context) {
-    print('Building FriendSearchScreen');
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
               surfaceTintColor: Colors.transparent,
-              backgroundColor: Colors.orange[100],
+              backgroundColor: AppColors.background,
               elevation: 0,
               title: const Text(
                 'Add Friends',
                 style: TextStyle(
-                  fontFamily: 'DancingScript',
-                  fontSize: 28,
+                  fontFamily: 'Headings',
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                 ),
               ),
             )
@@ -91,18 +90,19 @@ class _FriendSearchScreenState extends State<FriendSearchScreen>
               autofocus: true,
               decoration: InputDecoration(
                 hintText: 'Search by name or email',
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                prefixIcon:
+                    const Icon(Icons.search, color: AppColors.textSecondary),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.grey[200],
+                fillColor: AppColors.surfaceElevated,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 16,
                 ),
-                hintStyle: TextStyle(color: Colors.grey[600]),
+                hintStyle: TextStyle(color: AppColors.textSecondary),
               ),
               onChanged: _onSearchChanged,
             ),
@@ -124,7 +124,8 @@ class _FriendSearchScreenState extends State<FriendSearchScreen>
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text('Error: ${state.message}'),
+                      child: const Text(
+                          "Couldn't load this right now. Please try again."),
                     ),
                   );
                 }
@@ -170,22 +171,20 @@ class _FriendSearchScreenState extends State<FriendSearchScreen>
 
   Future<void> _sendFriendRequest(String userId) async {
     try {
-      print('Sending friend request to user ID: $userId');
       final repository = FriendRepositoryImpl();
       await repository.sendFriendRequest(userId);
-      print('Friend request sent successfully');
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Friend request sent')));
       }
-    } catch (e, stackTrace) {
-      print('Error sending friend request: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        ).showSnackBar(const SnackBar(
+            content: Text("Couldn't send your request. Please try again.")));
       }
     }
   }
@@ -212,7 +211,7 @@ class _FriendSearchScreenState extends State<FriendSearchScreen>
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: AppColors.textSecondary,
             ),
           ),
         ),

@@ -32,7 +32,8 @@ class HomeAssignment {
       title: (data['title'] ?? data['name']) as String? ?? '',
       subject: data['subject'] as String? ?? 'General',
       deadline: deadlineStamp?.toDate() ?? DateTime.now(),
-      isCompleted: data['isCompleted'] as bool? ?? data['completed'] as bool? ?? false,
+      isCompleted:
+          data['isCompleted'] as bool? ?? data['completed'] as bool? ?? false,
       estimatedMinutes: data['estimatedMinutes'] as int?,
       goalId: data['goalId'] as String?,
       milestoneId: data['milestoneId'] as String?,

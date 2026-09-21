@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:study_sensei/features/groups/data/enums/assignment_status.dart';
 import 'package:study_sensei/features/groups/data/models/group_assignment_model.dart';
@@ -30,11 +31,12 @@ class AssignmentList extends StatelessWidget {
             Icon(
               Icons.assignment_outlined,
               size: 64,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
-              'No assignments yet',
+              'No shared assignments yet.',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             if (isAdmin) ...[
@@ -60,28 +62,27 @@ class AssignmentList extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(right: 12.0),
                   child: Builder(
-                  builder: (context) {
-                    final isCompleted = assignment.isCompletedByUser(currentUserId);
-                    print('Rendering checkbox for assignment ${assignment.id} - isCompleted: $isCompleted');
-                    return Checkbox(
-                      value: isCompleted,
-                      onChanged: (value) {
-                        print('Checkbox toggled - new value: $value');
-                        if (value != null) {
-                          context.read<AssignmentBloc>().add(
-                            CompleteAssignment(
-                              assignmentId: assignment.id,
-                              groupId: groupId,
-                              userId: currentUserId,
-                              isCompleted: value,
-                            ),
-                          );
-                        }
-                      },
-                      activeColor: Theme.of(context).colorScheme.primary,
-                    );
-                  },
-                ),
+                    builder: (context) {
+                      final isCompleted =
+                          assignment.isCompletedByUser(currentUserId);
+                      return Checkbox(
+                        value: isCompleted,
+                        onChanged: (value) {
+                          if (value != null) {
+                            context.read<AssignmentBloc>().add(
+                                  CompleteAssignment(
+                                    assignmentId: assignment.id,
+                                    groupId: groupId,
+                                    userId: currentUserId,
+                                    isCompleted: value,
+                                  ),
+                                );
+                          }
+                        },
+                        activeColor: Theme.of(context).colorScheme.primary,
+                      );
+                    },
+                  ),
                 ),
                 // Assignment Title with Strike-through if completed
                 Expanded(
@@ -93,7 +94,7 @@ class AssignmentList extends StatelessWidget {
                           ? TextDecoration.lineThrough
                           : null,
                       color: assignment.isCompletedByUser(currentUserId)
-                          ? Colors.grey
+                          ? AppColors.textSecondary
                           : null,
                     ),
                   ),
@@ -105,30 +106,30 @@ class AssignmentList extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildStatusChip(context, assignment),
+                  const SizedBox(height: 8),
                   // Progress indicator
                   _buildProgressIndicator(context, assignment),
                   const SizedBox(height: 4.0),
-                Text(
-                  assignment.status == AssignmentStatus.completed && assignment.updatedAt != null
-                      ? 'Completed by ${_formatDate(assignment.updatedAt!)}'
-                      : 'Due: ${_formatDate(assignment.dueDate)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: assignment.status == AssignmentStatus.completed 
-                        ? Colors.green 
-                        : null,
-                    fontStyle: assignment.status == AssignmentStatus.completed 
-                        ? FontStyle.italic 
-                        : null,
+                  Text(
+                    assignment.status == AssignmentStatus.completed &&
+                            assignment.updatedAt != null
+                        ? 'Completed by ${_formatDate(assignment.updatedAt!)}'
+                        : 'Due: ${_formatDate(assignment.dueDate)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: assignment.status == AssignmentStatus.completed
+                              ? AppColors.success
+                              : null,
+                          fontStyle:
+                              assignment.status == AssignmentStatus.completed
+                                  ? FontStyle.italic
+                                  : null,
+                        ),
                   ),
-                ),
                 ],
               ),
             ),
             // Always show status chip, but with different styling for completed status
-            trailing: _buildStatusChip(context, assignment),
-            onTap: () {
-              // TODO: Navigate to assignment detail
-            },
           ),
         );
       },
@@ -138,26 +139,38 @@ class AssignmentList extends StatelessWidget {
   Widget _buildStatusChip(BuildContext context, GroupAssignment assignment) {
     final isCompleted = assignment.status == AssignmentStatus.completed;
     final color = _getStatusColor(assignment.status, context);
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       decoration: BoxDecoration(
-        color: isCompleted ? Colors.green.withOpacity(0.1) : color.withOpacity(0.1),
+        color: isCompleted
+            ? AppColors.success.withValues(alpha: 0.1)
+            : color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12.0),
-        border: isCompleted ? Border.all(color: Colors.green) : null,
+        border: isCompleted ? Border.all(color: AppColors.success) : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isCompleted)
-            const Icon(Icons.check_circle, size: 14, color: Colors.green,),
+            const Icon(
+              Icons.check_circle,
+              size: 14,
+              color: AppColors.success,
+            ),
           if (isCompleted) const SizedBox(width: 4),
           Text(
-            assignment.status.name,
+            switch (assignment.status) {
+              AssignmentStatus.notStarted => 'Not started',
+              AssignmentStatus.inProgress => 'In progress',
+              AssignmentStatus.completed => 'Completed',
+              AssignmentStatus.pastDue => 'Past due',
+              AssignmentStatus.graded => 'Graded',
+            },
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: isCompleted ? Colors.green : color,
-              fontWeight: FontWeight.bold,
-            ),
+                  color: isCompleted ? AppColors.success : color,
+                  fontWeight: FontWeight.bold,
+                ),
           ),
         ],
       ),
@@ -172,18 +185,18 @@ class AssignmentList extends StatelessWidget {
       case AssignmentStatus.inProgress:
         return theme.colorScheme.primary;
       case AssignmentStatus.completed:
-        return Colors.green;
+        return AppColors.success;
       case AssignmentStatus.pastDue:
         return theme.colorScheme.error;
       case AssignmentStatus.graded:
-        return Colors.green;
+        return AppColors.success;
     }
   }
-  
+
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = date.difference(DateTime(now.year, now.month, now.day));
-    
+
     if (difference.inDays == 0) {
       return 'Today, ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays == 1) {
@@ -194,7 +207,6 @@ class AssignmentList extends StatelessWidget {
       return '${_getMonth(date.month)} ${date.day}, ${date.year}';
     }
   }
-
 
   String _getMonth(int month) {
     const months = [
@@ -214,7 +226,8 @@ class AssignmentList extends StatelessWidget {
     return months[month - 1];
   }
 
-  Widget _buildProgressIndicator(BuildContext context, GroupAssignment assignment) {
+  Widget _buildProgressIndicator(
+      BuildContext context, GroupAssignment assignment) {
     final completedCount = assignment.userCompletion.values
         .where((isCompleted) => isCompleted)
         .length;
@@ -227,11 +240,11 @@ class AssignmentList extends StatelessWidget {
         if (totalAssigned > 0) ...[
           LinearProgressIndicator(
             value: totalAssigned > 0 ? completedCount / totalAssigned : 0,
-            backgroundColor: Colors.grey[200],
+            backgroundColor: AppColors.surfaceHighlight,
             valueColor: AlwaysStoppedAnimation<Color>(
-              allCompleted 
-                ? Colors.green 
-                : Theme.of(context).colorScheme.primary,
+              allCompleted
+                  ? AppColors.success
+                  : Theme.of(context).colorScheme.primary,
             ),
             minHeight: 6,
             borderRadius: BorderRadius.circular(3),
@@ -242,7 +255,7 @@ class AssignmentList extends StatelessWidget {
                 ? 'Completed by all members ✅'
                 : '$completedCount/$totalAssigned members completed',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: allCompleted ? Colors.green : null,
+                  color: allCompleted ? AppColors.success : null,
                   fontWeight: allCompleted ? FontWeight.bold : null,
                 ),
           ),
@@ -250,7 +263,7 @@ class AssignmentList extends StatelessWidget {
           Text(
             'No members assigned',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppColors.textSecondary,
                   fontStyle: FontStyle.italic,
                 ),
           ),

@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
-import 'package:study_sensei/features/groups/data/models/group_assignment_model.dart';
+import 'package:study_sensei/core/theme/app_colors.dart';
+import 'package:study_sensei/core/theme/app_typography.dart';
 import 'package:study_sensei/features/groups/data/models/group_model.dart';
 import 'package:study_sensei/features/groups/presentation/bloc/assignment/assignment_bloc.dart';
 import 'package:study_sensei/features/groups/presentation/widgets/assignment_list.dart';
 import 'package:study_sensei/features/groups/presentation/widgets/add_assignment_dialog.dart';
 import 'package:study_sensei/core/services/push_notification_service.dart';
 import 'package:study_sensei/features/groups/presentation/widgets/group_chat_tab.dart';
+import 'package:study_sensei/features/groups/presentation/widgets/dojo_resources_tab.dart';
 import 'package:study_sensei/features/auth/providers/user_provider.dart';
+import 'package:study_sensei/features/groups/data/services/dojo_engagement_service.dart';
+import 'package:study_sensei/features/groups/presentation/pages/dojo_announcements_screen.dart';
 
 class GroupDetailsScreen extends StatefulWidget {
   final Group group;
@@ -35,8 +39,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
   @override
   void initState() {
     super.initState();
-    print('GroupDetailsScreen - initState');
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, initialIndex: 0, vsync: this);
     _loadMemberDetails();
 
     // Listen to tab changes
@@ -71,14 +74,13 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
   void _handleTabChange() {
     if (!mounted) return;
 
-    if (_tabController.index == 0) {
+    if (_tabController.index == 1) {
       _loadAssignments();
     }
     setState(() {});
   }
 
   void _loadAssignments() {
-    print('GroupDetailsScreen - Dispatching LoadAssignments event');
     context.read<AssignmentBloc>().add(LoadAssignments(widget.group.id));
   }
 
@@ -92,30 +94,79 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
         listener: (context, state) {
           if (state is AssignmentError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
+              const SnackBar(
+                  content: Text("Couldn’t update assignments. Try again.")),
             );
           }
         },
         child: DefaultTabController(
-          length: 3,
+          length: 4,
           child: Scaffold(
             appBar: AppBar(
-              title: Text('${widget.group.name} Dojo'),
+              toolbarHeight:
+                  64 * MediaQuery.textScalerOf(context).scale(16) / 16,
+              title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.group.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.sectionTitle),
+                    Text('${widget.group.memberCount} members',
+                        style: AppTypography.caption),
+                  ]),
+              actions: _isCurrentUserAdmin
+                  ? [
+                      PopupMenuButton<String>(
+                        tooltip: 'Dojo management',
+                        onSelected: (action) {
+                          if (action == 'createAnnouncement') {
+                            _showAnnouncementDialog();
+                          } else if (action == 'manageAnnouncements') {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => DojoAnnouncementsScreen(
+                                  group: widget.group,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'createAnnouncement',
+                            child: Text('Create announcement'),
+                          ),
+                          PopupMenuItem(
+                            value: 'manageAnnouncements',
+                            child: Text('Manage Announcements'),
+                          ),
+                        ],
+                      ),
+                    ]
+                  : null,
               bottom: TabBar(
                 controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: AppColors.primaryLight,
+                unselectedLabelColor: AppColors.textSecondary,
+                dividerColor: Colors.transparent,
                 tabs: const [
-                  Tab(icon: Icon(Icons.assignment), text: 'Assignments'),
-                  Tab(icon: Icon(Icons.people), text: 'Members'),
-                  Tab(icon: Icon(Icons.chat), text: 'Chat'),
+                  Tab(text: 'Chat'),
+                  Tab(text: 'Assignments'),
+                  Tab(text: 'Resources'),
+                  Tab(text: 'Members'),
                 ],
               ),
             ),
             body: TabBarView(
               controller: _tabController,
               children: [
-                _buildAssignmentsTab(),
-                _buildMembersTab(),
                 _buildChatTab(context),
+                _buildAssignmentsTab(),
+                _buildResourcesTab(),
+                _buildMembersTab(),
               ],
             ),
             floatingActionButton: _buildFloatingActionButton(),
@@ -124,6 +175,10 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
       ),
     );
   }
+
+  bool get _isCurrentUserAdmin =>
+      widget.group.adminIds.contains(widget.currentUserId) ||
+      widget.group.createdBy == widget.currentUserId;
 
   Widget _buildAssignmentsTab() {
     return BlocBuilder<AssignmentBloc, AssignmentState>(
@@ -135,7 +190,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
         if (state is AssignmentLoadSuccess) {
           if (state.assignments.isEmpty) {
             debugPrint('GroupDetailsScreen - No assignments to display');
-            return const Center(child: Text('No assignments yet'));
+            return const Center(child: Text('No shared assignments yet.'));
           }
 
           return AssignmentList(
@@ -156,7 +211,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Error loading assignments: ${state.message}'),
+                Text("Couldn’t load assignments right now."),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: _loadAssignments,
@@ -167,8 +222,27 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
           );
         }
 
-        return const Center(child: Text('No assignments yet'));
+        return const Center(child: Text('No shared assignments yet.'));
       },
+    );
+  }
+
+  Widget _buildResourcesTab() {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final userPreferences = userProvider.userPreferences;
+    final memberData =
+        _membersCache[widget.currentUserId] as Map<String, dynamic>? ?? {};
+    final uploaderName = (userPreferences?.name?.trim().isNotEmpty ?? false)
+        ? userPreferences!.name!.trim()
+        : memberData['name']?.toString() ??
+            memberData['displayName']?.toString() ??
+            userProvider.user?.displayName ??
+            'Dojo member';
+
+    return DojoResourcesTab(
+      group: widget.group,
+      currentUserId: widget.currentUserId,
+      currentUserName: uploaderName,
     );
   }
 
@@ -180,32 +254,47 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
         final memberId = widget.group.memberIds[index];
         final isAdmin = widget.group.adminIds.contains(memberId);
         final memberData = _membersCache[memberId] ?? {};
+        final displayName = memberData['name']?.toString() ?? 'Dojo member';
+        final subtitle = isAdmin ? 'Admin' : 'Member';
 
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Theme.of(context).primaryColor,
-            child: memberData['photoUrl'] != null
-                ? ClipOval(
-                    child: Image.network(
-                      memberData['photoUrl'],
-                      fit: BoxFit.cover,
-                      width: 40,
-                      height: 40,
-                    ),
-                  )
-                : Text(
-                    memberData['name']?.substring(0, 1).toUpperCase() ?? '?',
-                    style: const TextStyle(color: Colors.white),
-                  ),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.borderSubtle),
           ),
-          title: Text(memberData['name'] ?? 'Unknown User'),
-          subtitle: isAdmin ? const Text('Admin') : const Text('Member'),
-          trailing: widget.group.adminIds.contains(widget.currentUserId)
-              ? IconButton(
-                  icon: const Icon(Icons.more_vert),
-                  onPressed: () => _showMemberOptions(memberId, isAdmin),
-                )
-              : null,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 8,
+            ),
+            leading: CircleAvatar(
+              backgroundColor: AppColors.primary.withValues(alpha: 0.14),
+              child: memberData['photoUrl'] != null
+                  ? ClipOval(
+                      child: Image.network(
+                        memberData['photoUrl'],
+                        fit: BoxFit.cover,
+                        width: 40,
+                        height: 40,
+                      ),
+                    )
+                  : Text(
+                      displayName.trim().isNotEmpty
+                          ? displayName.characters.first.toUpperCase()
+                          : '?',
+                      style: const TextStyle(color: AppColors.primaryLight),
+                    ),
+            ),
+            title: Text(displayName, style: AppTypography.cardTitle),
+            subtitle: Text(
+              subtitle,
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
         );
       },
     );
@@ -233,17 +322,72 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
       currentUserId: widget.currentUserId,
       currentUserName: chatUserName,
       currentUserPhotoUrl: chatUserPhotoUrl,
-      isCurrentUserAdmin: widget.group.adminIds.contains(widget.currentUserId),
+      isCurrentUserAdmin: _isCurrentUserAdmin,
+      showEngagement: true,
+      group: widget.group,
     );
   }
 
+  Future<void> _showAnnouncementDialog() async {
+    final title = TextEditingController();
+    final body = TextEditingController();
+    final posted = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+                title: const Text('Create announcement'),
+                content: Column(mainAxisSize: MainAxisSize.min, children: [
+                  TextField(
+                      controller: title,
+                      decoration: const InputDecoration(labelText: 'Title')),
+                  TextField(
+                      controller: body,
+                      maxLines: 4,
+                      decoration: const InputDecoration(labelText: 'Body'))
+                ]),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Cancel')),
+                  TextButton(
+                      onPressed: () async {
+                        if (title.text.trim().isEmpty ||
+                            body.text.trim().isEmpty) {
+                          return;
+                        }
+                        final user =
+                            Provider.of<UserProvider>(context, listen: false);
+                        final name = user.userPreferences?.name ??
+                            user.user?.displayName ??
+                            'Dojo admin';
+                        await DojoEngagementService().createAnnouncement(
+                            group: widget.group,
+                            title: title.text,
+                            body: body.text,
+                            name: name);
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      },
+                      child: const Text('Post Announcement'))
+                ]));
+    title.dispose();
+    body.dispose();
+    if (posted == true && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Announcement posted.')));
+    }
+  }
+
   Widget? _buildFloatingActionButton() {
-    // Show FAB on assignments tab for all users
-    if (_tabController.index != 0) {
+    // Assignments is the second Dojo tab.
+    if (_tabController.index != 1) {
       return null;
     }
 
     return FloatingActionButton(
+      tooltip: 'Add assignment',
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.textPrimary,
       onPressed: _showAddAssignmentDialog,
       child: const Icon(Icons.add),
     );
@@ -268,41 +412,6 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen>
             );
           },
         ),
-      ),
-    );
-  }
-
-  void _navigateToGroupSettings() {
-    // TODO: Implement dojo settings navigation
-  }
-
-  void _showMemberOptions(String memberId, bool isAdmin) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!isAdmin)
-            ListTile(
-              leading: const Icon(Icons.admin_panel_settings),
-              title: const Text('Make Admin'),
-              onTap: () {
-                // TODO: Implement make admin
-                Navigator.pop(context);
-              },
-            ),
-          ListTile(
-            leading: const Icon(Icons.person_remove, color: Colors.red),
-            title: const Text(
-              'Remove from Dojo',
-              style: TextStyle(color: Colors.red),
-            ),
-            onTap: () {
-              // TODO: Implement remove from dojo
-              Navigator.pop(context);
-            },
-          ),
-        ],
       ),
     );
   }
